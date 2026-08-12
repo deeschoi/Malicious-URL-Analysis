@@ -1,0 +1,167 @@
+{
+  "baseline_accuracy": 0.9587357330992098,
+  "scenarios": [
+    {
+      "scenario": "All 30 features",
+      "n_features": 30,
+      "delta_vs_full": 0.0,
+      "accuracy": 0.9587357330992098,
+      "auroc": 0.9938413759780543,
+      "aupr": 0.9928143252199404,
+      "precision": 0.9486434108527132,
+      "recall": 0.9598039215686275,
+      "f1": 0.9541910331384016,
+      "log_loss": 0.09975276603681789,
+      "brier": 0.031122334538364604
+    },
+    {
+      "scenario": "Without SSLfinal_State",
+      "n_features": 29,
+      "delta_vs_full": -0.039508340649692664,
+      "accuracy": 0.9192273924495171,
+      "auroc": 0.981423594875152,
+      "aupr": 0.9791314650517959,
+      "precision": 0.9188376753507014,
+      "recall": 0.8990196078431373,
+      "f1": 0.908820614469772,
+      "log_loss": 0.17345537965814994,
+      "brier": 0.056553402734949104
+    },
+    {
+      "scenario": "Without the 5 dead-service features",
+      "n_features": 25,
+      "delta_vs_full": -0.019754170324846276,
+      "accuracy": 0.9389815627743635,
+      "auroc": 0.98762780947037,
+      "aupr": 0.9861573712842973,
+      "precision": 0.9357072205736894,
+      "recall": 0.9274509803921569,
+      "f1": 0.931560807483998,
+      "log_loss": 0.14151238800587787,
+      "brier": 0.04438276886540619
+    },
+    {
+      "scenario": "Without dead services or SSL",
+      "n_features": 24,
+      "delta_vs_full": -0.06716417910447758,
+      "accuracy": 0.8915715539947322,
+      "auroc": 0.9697048692290907,
+      "aupr": 0.9665056281088522,
+      "precision": 0.890798786653185,
+      "recall": 0.8637254901960785,
+      "f1": 0.8770532603285216,
+      "log_loss": 0.22358971176215903,
+      "brier": 0.07096877010929105
+    },
+    {
+      "scenario": "Without the 7 reversed features",
+      "n_features": 23,
+      "delta_vs_full": -0.015803336259877065,
+      "accuracy": 0.9429323968393327,
+      "auroc": 0.9922164811870694,
+      "aupr": 0.9908579238075472,
+      "precision": 0.928709055876686,
+      "recall": 0.9450980392156862,
+      "f1": 0.9368318756073858,
+      "log_loss": 0.11471487337936191,
+      "brier": 0.03716781240155455
+    },
+    {
+      "scenario": "Without reversed or no-signal features",
+      "n_features": 20,
+      "delta_vs_full": -0.017559262510974505,
+      "accuracy": 0.9411764705882353,
+      "auroc": 0.9915992549643069,
+      "aupr": 0.9902207868942616,
+      "precision": 0.9267822736030829,
+      "recall": 0.9431372549019608,
+      "f1": 0.93488824101069,
+      "log_loss": 0.11961190529077584,
+      "brier": 0.038615808903819535
+    },
+    {
+      "scenario": "URL string only (no network)",
+      "n_features": 8,
+      "delta_vs_full": -0.22168568920105347,
+      "accuracy": 0.7370500438981563,
+      "auroc": 0.8082815081517504,
+      "aupr": 0.730420772571706,
+      "precision": 0.6838427947598253,
+      "recall": 0.7676470588235295,
+      "f1": 0.7233256351039261,
+      "log_loss": 0.5127890446790511,
+      "brier": 0.17468546490185588
+    },
+    {
+      "scenario": "URL string + TLS certificate",
+      "n_features": 9,
+      "delta_vs_full": -0.047410008779631196,
+      "accuracy": 0.9113257243195786,
+      "auroc": 0.958908865613018,
+      "aupr": 0.9487169437924444,
+      "precision": 0.9106425702811245,
+      "recall": 0.8892156862745098,
+      "f1": 0.8998015873015873,
+      "log_loss": 0.24893541049182713,
+      "brier": 0.07344148973089554
+    },
+    {
+      "scenario": "URL + TLS + page fetch",
+      "n_features": 20,
+      "delta_vs_full": -0.027216856892010477,
+      "accuracy": 0.9315188762071993,
+      "auroc": 0.9865831229153028,
+      "aupr": 0.9844942175008915,
+      "precision": 0.9194174757281554,
+      "recall": 0.9284313725490196,
+      "f1": 0.9239024390243903,
+      "log_loss": 0.14753998523118447,
+      "brier": 0.04762828170786319
+    },
+    {
+      "scenario": "Everything computable in 2026",
+      "n_features": 25,
+      "delta_vs_full": -0.019754170324846276,
+      "accuracy": 0.9389815627743635,
+      "auroc": 0.98762780947037,
+      "aupr": 0.9861573712842973,
+      "precision": 0.9357072205736894,
+      "recall": 0.9274509803921569,
+      "f1": 0.931560807483998,
+      "log_loss": 0.14151238800587787,
+      "brier": 0.04438276886540619
+    }
+  ],
+  "leave_one_out": [
+    {
+      "feature": "SSLfinal_State",
+      "accuracy_without": 0.9192273924495171,
+      "accuracy_lost": 0.039508340649692664
+    },
+    {
+      "feature": "URL_of_Anchor",
+      "accuracy_without": 0.9525899912203687,
+      "accuracy_lost": 0.006145741878841093
+    },
+    {
+      "feature": "web_traffic",
+      "accuracy_without": 0.9534679543459175,
+      "accuracy_lost": 0.005267778753292318
+    },
+    {
+      "feature": "Prefix_Suffix",
+      "accuracy_without": 0.9587357330992098,
+      "accuracy_lost": 0.0
+    },
+    {
+      "feature": "having_Sub_Domain",
+      "accuracy_without": 0.9482001755926251,
+      "accuracy_lost": 0.010535557506584636
+    },
+    {
+      "feature": "Links_in_tags",
+      "accuracy_without": 0.9503950834064969,
+      "accuracy_lost": 0.008340649692712865
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+rule,cluster,match_rate,n_cluster
+SSLfinal_State=-1 AND URL_of_Anchor=-1,0,0.39663865546218485,1785
+SSLfinal_State=-1 AND URL_of_Anchor=-1,1,0.43389830508474575,885
+SSLfinal_State=-1 AND URL_of_Anchor=-1,2,0.43980738362760835,1246
+Links_pointing_to_page=0 AND URL_of_Anchor=-1,0,0.434733893557423,1785
+Links_pointing_to_page=0 AND URL_of_Anchor=-1,1,0.17062146892655367,885
+Links_pointing_to_page=0 AND URL_of_Anchor=-1,2,0.4518459069020867,1246
+Request_URL=-1 AND URL_of_Anchor=-1,0,0.2145658263305322,1785
+Request_URL=-1 AND URL_of_Anchor=-1,1,0.31412429378531076,885
+Request_URL=-1 AND URL_of_Anchor=-1,2,0.6621187800963082,1246
+URL_of_Anchor=-1 AND having_Sub_Domain=0,0,0.43641456582633054,1785
+URL_of_Anchor=-1 AND having_Sub_Domain=0,1,0.21807909604519773,885
+URL_of_Anchor=-1 AND having_Sub_Domain=0,2,0.26324237560192615,1246
+Domain_registeration_length=1 AND URL_of_Anchor=-1,0,0.12773109243697478,1785
+Domain_registeration_length=1 AND URL_of_Anchor=-1,1,0.22372881355932203,885
+Domain_registeration_length=1 AND URL_of_Anchor=-1,2,0.6043338683788122,1246
+URL_of_Anchor=-1 AND web_traffic=0,0,0.2896358543417367,1785
+URL_of_Anchor=-1 AND web_traffic=0,1,0.21129943502824858,885
+URL_of_Anchor=-1 AND web_traffic=0,2,0.10914927768860354,1246
+SSLfinal_State=0 AND URL_of_Anchor=-1,0,0.1887955182072829,1785
+SSLfinal_State=0 AND URL_of_Anchor=-1,1,0.25649717514124293,885
+SSLfinal_State=0 AND URL_of_Anchor=-1,2,0.1926163723916533,1246
+URL_of_Anchor=-1 AND age_of_domain=-1,0,0.3988795518207283,1785
+URL_of_Anchor=-1 AND age_of_domain=-1,1,0.12090395480225989,885
+URL_of_Anchor=-1 AND age_of_domain=-1,2,0.42696629213483145,1246

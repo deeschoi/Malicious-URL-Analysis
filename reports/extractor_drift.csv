@@ -1,0 +1,9 @@
+,mean_2012_legit,mean_2026_legit_tierA,mean_synthetic_phish_tierA
+having_IP_Address,0.39353581289589085,1.0,0.6
+URL_Length,-0.5939580964755563,1.0,0.8
+Shortining_Service,0.6979048237778138,1.0,0.6
+having_At_Symbol,0.734286178333604,1.0,0.8
+double_slash_redirecting,0.7183693357154458,1.0,0.8
+Prefix_Suffix,-0.524118889069352,1.0,0.4
+having_Sub_Domain,0.28146824752314437,1.0,0.4
+HTTPS_token,0.648854961832061,1.0,0.8

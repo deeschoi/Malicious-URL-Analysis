@@ -1,0 +1,34 @@
+|--- SSLfinal_State <= 0.50
+|   |--- URL_of_Anchor <= -0.50
+|   |   |--- class: 1
+|   |--- URL_of_Anchor >  -0.50
+|   |   |--- Links_in_tags <= -0.50
+|   |   |   |--- URL_of_Anchor <= 0.50
+|   |   |   |   |--- class: 1
+|   |   |   |--- URL_of_Anchor >  0.50
+|   |   |   |   |--- class: 1
+|   |   |--- Links_in_tags >  -0.50
+|   |   |   |--- URL_of_Anchor <= 0.50
+|   |   |   |   |--- class: 1
+|   |   |   |--- URL_of_Anchor >  0.50
+|   |   |   |   |--- class: 0
+|--- SSLfinal_State >  0.50
+|   |--- URL_of_Anchor <= -0.50
+|   |   |--- Links_in_tags <= -0.50
+|   |   |   |--- class: 1
+|   |   |--- Links_in_tags >  -0.50
+|   |   |   |--- Links_in_tags <= 0.50
+|   |   |   |   |--- class: 1
+|   |   |   |--- Links_in_tags >  0.50
+|   |   |   |   |--- class: 1
+|   |--- URL_of_Anchor >  -0.50
+|   |   |--- Links_in_tags <= -0.50
+|   |   |   |--- URL_of_Anchor <= 0.50
+|   |   |   |   |--- class: 0
+|   |   |   |--- URL_of_Anchor >  0.50
+|   |   |   |   |--- class: 0
+|   |   |--- Links_in_tags >  -0.50
+|   |   |   |--- URL_of_Anchor <= 0.50
+|   |   |   |   |--- class: 0
+|   |   |   |--- URL_of_Anchor >  0.50
+|   |   |   |   |--- class: 0

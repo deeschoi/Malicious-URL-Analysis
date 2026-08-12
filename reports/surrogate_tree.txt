@@ -1,0 +1,19 @@
+|--- SSLfinal_State <= 0
+|   |--- URL_of_Anchor <= -0
+|   |   |--- class: 1
+|   |--- URL_of_Anchor >  -0
+|   |   |--- Links_in_tags <= -0
+|   |   |   |--- class: 1
+|   |   |--- Links_in_tags >  -0
+|   |   |   |--- class: 0
+|--- SSLfinal_State >  0
+|   |--- URL_of_Anchor <= -0
+|   |   |--- Prefix_Suffix <= 0
+|   |   |   |--- class: 1
+|   |   |--- Prefix_Suffix >  0
+|   |   |   |--- class: 0
+|   |--- URL_of_Anchor >  -0
+|   |   |--- web_traffic <= 0
+|   |   |   |--- class: 0
+|   |   |--- web_traffic >  0
+|   |   |   |--- class: 0

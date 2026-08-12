@@ -1,0 +1,15 @@
+.venv/
+legacy/
+.ipynb_checkpoints/
+.DS_Store
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+artifacts/
+*.joblib
+reports/figures/
+.coverage
+htmlcov/

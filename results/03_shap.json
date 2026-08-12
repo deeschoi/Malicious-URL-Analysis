@@ -1,0 +1,2768 @@
+{
+  "top_two_share": 0.4200248122215271,
+  "importance": [
+    {
+      "feature": "URL_of_Anchor",
+      "shap_mean_abs": 2.4498305320739746,
+      "permutation_drop": 0.12980684811237922,
+      "gini": 0.23787102103233337,
+      "shap_share": 0.22004903852939606,
+      "gini_rank": 2,
+      "shap_rank": 1,
+      "rank_shift": 1
+    },
+    {
+      "feature": "SSLfinal_State",
+      "shap_mean_abs": 2.2263524532318115,
+      "permutation_drop": 0.09820017559262505,
+      "gini": 0.32987913489341736,
+      "shap_share": 0.19997575879096985,
+      "gini_rank": 1,
+      "shap_rank": 2,
+      "rank_shift": -1
+    },
+    {
+      "feature": "web_traffic",
+      "shap_mean_abs": 0.699137270450592,
+      "permutation_drop": 0.020807726075504785,
+      "gini": 0.02726423367857933,
+      "shap_share": 0.06279800832271576,
+      "gini_rank": 5,
+      "shap_rank": 3,
+      "rank_shift": 2
+    },
+    {
+      "feature": "Prefix_Suffix",
+      "shap_mean_abs": 0.650126576423645,
+      "permutation_drop": 0.0194907813871817,
+      "gini": 0.10488633811473846,
+      "shap_share": 0.058395761996507645,
+      "gini_rank": 3,
+      "shap_rank": 4,
+      "rank_shift": -1
+    },
+    {
+      "feature": "having_Sub_Domain",
+      "shap_mean_abs": 0.5529963970184326,
+      "permutation_drop": 0.013125548726953406,
+      "gini": 0.016561903059482574,
+      "shap_share": 0.049671322107315063,
+      "gini_rank": 8,
+      "shap_rank": 5,
+      "rank_shift": 3
+    },
+    {
+      "feature": "Links_in_tags",
+      "shap_mean_abs": 0.5502249598503113,
+      "permutation_drop": 0.012071992976294943,
+      "gini": 0.02244838885962963,
+      "shap_share": 0.04942238703370094,
+      "gini_rank": 6,
+      "shap_rank": 6,
+      "rank_shift": 0
+    },
+    {
+      "feature": "Links_pointing_to_page",
+      "shap_mean_abs": 0.5077762603759766,
+      "permutation_drop": 0.015715539947322155,
+      "gini": 0.011163853108882904,
+      "shap_share": 0.045609552413225174,
+      "gini_rank": 14,
+      "shap_rank": 7,
+      "rank_shift": 7
+    },
+    {
+      "feature": "having_IP_Address",
+      "shap_mean_abs": 0.4571734070777893,
+      "permutation_drop": 0.011018437225636469,
+      "gini": 0.013412458822131157,
+      "shap_share": 0.041064295917749405,
+      "gini_rank": 11,
+      "shap_rank": 8,
+      "rank_shift": 3
+    },
+    {
+      "feature": "SFH",
+      "shap_mean_abs": 0.443829745054245,
+      "permutation_drop": 0.008033362598770799,
+      "gini": 0.028969813138246536,
+      "shap_share": 0.03986573964357376,
+      "gini_rank": 4,
+      "shap_rank": 9,
+      "rank_shift": -5
+    },
+    {
+      "feature": "DNSRecord",
+      "shap_mean_abs": 0.3383432924747467,
+      "permutation_drop": 0.010008779631255427,
+      "gini": 0.016792571172118187,
+      "shap_share": 0.030390720814466476,
+      "gini_rank": 7,
+      "shap_rank": 10,
+      "rank_shift": -3
+    },
+    {
+      "feature": "Google_Index",
+      "shap_mean_abs": 0.26953747868537903,
+      "permutation_drop": 0.002414398595258949,
+      "gini": 0.014601023867726326,
+      "shap_share": 0.024210434406995773,
+      "gini_rank": 9,
+      "shap_rank": 11,
+      "rank_shift": -2
+    },
+    {
+      "feature": "Domain_registeration_length",
+      "shap_mean_abs": 0.23907145857810974,
+      "permutation_drop": 0.0029850746268656357,
+      "gini": 0.012944321148097515,
+      "shap_share": 0.02147391065955162,
+      "gini_rank": 12,
+      "shap_rank": 12,
+      "rank_shift": 0
+    },
+    {
+      "feature": "age_of_domain",
+      "shap_mean_abs": 0.2187862992286682,
+      "permutation_drop": 0.0038191395961369224,
+      "gini": 0.010852525942027569,
+      "shap_share": 0.019651854410767555,
+      "gini_rank": 15,
+      "shap_rank": 13,
+      "rank_shift": 2
+    },
+    {
+      "feature": "Request_URL",
+      "shap_mean_abs": 0.21058063209056854,
+      "permutation_drop": 0.0047848990342405084,
+      "gini": 0.011361578479409218,
+      "shap_share": 0.018914803862571716,
+      "gini_rank": 13,
+      "shap_rank": 14,
+      "rank_shift": -1
+    },
+    {
+      "feature": "Page_Rank",
+      "shap_mean_abs": 0.16490133106708527,
+      "permutation_drop": 0.007067603160667213,
+      "gini": 0.008893724530935287,
+      "shap_share": 0.014811791479587555,
+      "gini_rank": 23,
+      "shap_rank": 15,
+      "rank_shift": 8
+    },
+    {
+      "feature": "popUpWidnow",
+      "shap_mean_abs": 0.13840439915657043,
+      "permutation_drop": 0.0049165935030728415,
+      "gini": 0.0106369499117136,
+      "shap_share": 0.012431779876351357,
+      "gini_rank": 17,
+      "shap_rank": 16,
+      "rank_shift": 1
+    },
+    {
+      "feature": "Shortining_Service",
+      "shap_mean_abs": 0.13582541048526764,
+      "permutation_drop": 0.0017120280948199728,
+      "gini": 0.014024630188941956,
+      "shap_share": 0.0122001301497221,
+      "gini_rank": 10,
+      "shap_rank": 17,
+      "rank_shift": -7
+    },
+    {
+      "feature": "URL_Length",
+      "shap_mean_abs": 0.12196578085422516,
+      "permutation_drop": 0.0018876207199297057,
+      "gini": 0.010367842391133308,
+      "shap_share": 0.010955228470265865,
+      "gini_rank": 18,
+      "shap_rank": 18,
+      "rank_shift": 0
+    },
+    {
+      "feature": "Redirect",
+      "shap_mean_abs": 0.1202891618013382,
+      "permutation_drop": 0.0006584723441615092,
+      "gini": 0.010716202668845654,
+      "shap_share": 0.010804630815982819,
+      "gini_rank": 16,
+      "shap_rank": 19,
+      "rank_shift": -3
+    },
+    {
+      "feature": "double_slash_redirecting",
+      "shap_mean_abs": 0.09344002604484558,
+      "permutation_drop": 0.0015364354697102068,
+      "gini": 0.006805941462516785,
+      "shap_share": 0.008392984047532082,
+      "gini_rank": 28,
+      "shap_rank": 20,
+      "rank_shift": 8
+    },
+    {
+      "feature": "Favicon",
+      "shap_mean_abs": 0.09332248568534851,
+      "permutation_drop": 0.0028972783143107585,
+      "gini": 0.009693518280982971,
+      "shap_share": 0.008382425643503666,
+      "gini_rank": 20,
+      "shap_rank": 21,
+      "rank_shift": -1
+    },
+    {
+      "feature": "Abnormal_URL",
+      "shap_mean_abs": 0.08249996602535248,
+      "permutation_drop": 0.002151009657594338,
+      "gini": 0.00917977187782526,
+      "shap_share": 0.007410323712974787,
+      "gini_rank": 21,
+      "shap_rank": 22,
+      "rank_shift": -1
+    },
+    {
+      "feature": "having_At_Symbol",
+      "shap_mean_abs": 0.08066067844629288,
+      "permutation_drop": 0.0005706760316066206,
+      "gini": 0.00515946839004755,
+      "shap_share": 0.007245115004479885,
+      "gini_rank": 30,
+      "shap_rank": 23,
+      "rank_shift": 7
+    },
+    {
+      "feature": "Submitting_to_email",
+      "shap_mean_abs": 0.07397318631410599,
+      "permutation_drop": 0.002414398595258949,
+      "gini": 0.009709686040878296,
+      "shap_share": 0.0066444301046431065,
+      "gini_rank": 19,
+      "shap_rank": 24,
+      "rank_shift": -5
+    },
+    {
+      "feature": "HTTPS_token",
+      "shap_mean_abs": 0.06103019788861275,
+      "permutation_drop": 0.0011413520632133078,
+      "gini": 0.008730903267860413,
+      "shap_share": 0.005481863394379616,
+      "gini_rank": 24,
+      "shap_rank": 25,
+      "rank_shift": -1
+    },
+    {
+      "feature": "Statistical_report",
+      "shap_mean_abs": 0.04045902192592621,
+      "permutation_drop": 0.0005706760316066317,
+      "gini": 0.005956917069852352,
+      "shap_share": 0.0036341161467134953,
+      "gini_rank": 29,
+      "shap_rank": 26,
+      "rank_shift": 3
+    },
+    {
+      "feature": "Iframe",
+      "shap_mean_abs": 0.03968784958124161,
+      "permutation_drop": 0.00039508340649688776,
+      "gini": 0.009144902229309082,
+      "shap_share": 0.0035648478660732508,
+      "gini_rank": 22,
+      "shap_rank": 27,
+      "rank_shift": -5
+    },
+    {
+      "feature": "port",
+      "shap_mean_abs": 0.03500010445713997,
+      "permutation_drop": -0.00017559262510978834,
+      "gini": 0.007837149314582348,
+      "shap_share": 0.0031437843572348356,
+      "gini_rank": 25,
+      "shap_rank": 28,
+      "rank_shift": -3
+    },
+    {
+      "feature": "on_mouseover",
+      "shap_mean_abs": 0.03003016486763954,
+      "permutation_drop": 0.0018437225636522615,
+      "gini": 0.007152105215936899,
+      "shap_share": 0.002697373740375042,
+      "gini_rank": 26,
+      "shap_rank": 29,
+      "rank_shift": -3
+    },
+    {
+      "feature": "RightClick",
+      "shap_mean_abs": 0.007854504510760307,
+      "permutation_drop": 8.779631255484421e-05,
+      "gini": 0.006981045939028263,
+      "shap_share": 0.000705508457031101,
+      "gini_rank": 27,
+      "shap_rank": 30,
+      "rank_shift": -3
+    }
+  ],
+  "interactions": [
+    {
+      "a": "SSLfinal_State",
+      "b": "URL_of_Anchor",
+      "strength": 0.28452861309051514
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "web_traffic",
+      "strength": 0.18037500977516174
+    },
+    {
+      "a": "DNSRecord",
+      "b": "web_traffic",
+      "strength": 0.12071511894464493
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "SFH",
+      "strength": 0.10536036640405655
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "age_of_domain",
+      "strength": 0.10151296854019165
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "age_of_domain",
+      "strength": 0.1009589284658432
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Page_Rank",
+      "strength": 0.08971882611513138
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "web_traffic",
+      "strength": 0.08950799703598022
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "SSLfinal_State",
+      "strength": 0.08642687648534775
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "web_traffic",
+      "strength": 0.08575259894132614
+    },
+    {
+      "a": "age_of_domain",
+      "b": "web_traffic",
+      "strength": 0.08288440853357315
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Links_pointing_to_page",
+      "strength": 0.08201725780963898
+    },
+    {
+      "a": "SFH",
+      "b": "web_traffic",
+      "strength": 0.08200063556432724
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Links_pointing_to_page",
+      "strength": 0.0803200826048851
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Links_in_tags",
+      "strength": 0.07955872267484665
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "web_traffic",
+      "strength": 0.0742030069231987
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Links_in_tags",
+      "strength": 0.07403027266263962
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Links_pointing_to_page",
+      "strength": 0.07288148254156113
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "having_Sub_Domain",
+      "strength": 0.07166456431150436
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Links_pointing_to_page",
+      "strength": 0.07039012759923935
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "URL_of_Anchor",
+      "strength": 0.07025271654129028
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "DNSRecord",
+      "strength": 0.06763868033885956
+    },
+    {
+      "a": "DNSRecord",
+      "b": "Links_pointing_to_page",
+      "strength": 0.0659029558300972
+    },
+    {
+      "a": "URL_Length",
+      "b": "Links_pointing_to_page",
+      "strength": 0.06556334346532822
+    },
+    {
+      "a": "age_of_domain",
+      "b": "Page_Rank",
+      "strength": 0.0654958039522171
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "SSLfinal_State",
+      "strength": 0.06517340987920761
+    },
+    {
+      "a": "age_of_domain",
+      "b": "DNSRecord",
+      "strength": 0.06461001187562943
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "SFH",
+      "strength": 0.06367197632789612
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "age_of_domain",
+      "strength": 0.06110845506191254
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Google_Index",
+      "strength": 0.060178641229867935
+    },
+    {
+      "a": "SFH",
+      "b": "Links_pointing_to_page",
+      "strength": 0.059648677706718445
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "SFH",
+      "strength": 0.05913040041923523
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "DNSRecord",
+      "strength": 0.056017130613327026
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "web_traffic",
+      "strength": 0.054172687232494354
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Request_URL",
+      "strength": 0.05336357280611992
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "URL_of_Anchor",
+      "strength": 0.05333167687058449
+    },
+    {
+      "a": "web_traffic",
+      "b": "Page_Rank",
+      "strength": 0.05294884741306305
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Links_in_tags",
+      "strength": 0.051201414316892624
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "DNSRecord",
+      "strength": 0.050980307161808014
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Page_Rank",
+      "strength": 0.0482475645840168
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "URL_of_Anchor",
+      "strength": 0.04680880531668663
+    },
+    {
+      "a": "age_of_domain",
+      "b": "Links_pointing_to_page",
+      "strength": 0.04562632739543915
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "DNSRecord",
+      "strength": 0.04369639977812767
+    },
+    {
+      "a": "SFH",
+      "b": "DNSRecord",
+      "strength": 0.04200435057282448
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "age_of_domain",
+      "strength": 0.04095979034900665
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Request_URL",
+      "strength": 0.040904492139816284
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "DNSRecord",
+      "strength": 0.03899650275707245
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "URL_of_Anchor",
+      "strength": 0.0389396958053112
+    },
+    {
+      "a": "web_traffic",
+      "b": "Google_Index",
+      "strength": 0.038678985089063644
+    },
+    {
+      "a": "Request_URL",
+      "b": "web_traffic",
+      "strength": 0.037920936942100525
+    },
+    {
+      "a": "web_traffic",
+      "b": "Links_pointing_to_page",
+      "strength": 0.037315066903829575
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Links_pointing_to_page",
+      "strength": 0.03691145032644272
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "SFH",
+      "strength": 0.035349052399396896
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Iframe",
+      "strength": 0.034736696630716324
+    },
+    {
+      "a": "Request_URL",
+      "b": "Links_in_tags",
+      "strength": 0.03355604037642479
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Links_pointing_to_page",
+      "strength": 0.033300403505563736
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Page_Rank",
+      "strength": 0.032977379858493805
+    },
+    {
+      "a": "Request_URL",
+      "b": "URL_of_Anchor",
+      "strength": 0.03287072852253914
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "SFH",
+      "strength": 0.03191177546977997
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Links_in_tags",
+      "strength": 0.031866397708654404
+    },
+    {
+      "a": "DNSRecord",
+      "b": "Page_Rank",
+      "strength": 0.030668335035443306
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Links_in_tags",
+      "strength": 0.029947450384497643
+    },
+    {
+      "a": "URL_Length",
+      "b": "web_traffic",
+      "strength": 0.029141834005713463
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "SSLfinal_State",
+      "strength": 0.028736794367432594
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Domain_registeration_length",
+      "strength": 0.02841855026781559
+    },
+    {
+      "a": "age_of_domain",
+      "b": "Google_Index",
+      "strength": 0.027994737029075623
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "popUpWidnow",
+      "strength": 0.027967967092990875
+    },
+    {
+      "a": "URL_Length",
+      "b": "Shortining_Service",
+      "strength": 0.02795042097568512
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Domain_registeration_length",
+      "strength": 0.027924859896302223
+    },
+    {
+      "a": "URL_Length",
+      "b": "Submitting_to_email",
+      "strength": 0.027316896244883537
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Links_in_tags",
+      "strength": 0.027225563302636147
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "SFH",
+      "strength": 0.027028393000364304
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "web_traffic",
+      "strength": 0.02672131359577179
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "SFH",
+      "strength": 0.025439059361815453
+    },
+    {
+      "a": "Page_Rank",
+      "b": "Google_Index",
+      "strength": 0.025426173582673073
+    },
+    {
+      "a": "Request_URL",
+      "b": "Links_pointing_to_page",
+      "strength": 0.025098120793700218
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "popUpWidnow",
+      "strength": 0.025094373151659966
+    },
+    {
+      "a": "URL_Length",
+      "b": "SFH",
+      "strength": 0.02504434995353222
+    },
+    {
+      "a": "Request_URL",
+      "b": "Page_Rank",
+      "strength": 0.024839229881763458
+    },
+    {
+      "a": "web_traffic",
+      "b": "Statistical_report",
+      "strength": 0.024745913222432137
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Page_Rank",
+      "strength": 0.024356339126825333
+    },
+    {
+      "a": "DNSRecord",
+      "b": "Google_Index",
+      "strength": 0.02430526725947857
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Links_pointing_to_page",
+      "strength": 0.023310834541916847
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "age_of_domain",
+      "strength": 0.022014465183019638
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "double_slash_redirecting",
+      "strength": 0.021736690774559975
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Request_URL",
+      "strength": 0.02155470848083496
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "having_Sub_Domain",
+      "strength": 0.021437017247080803
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Page_Rank",
+      "strength": 0.021432682871818542
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "SSLfinal_State",
+      "strength": 0.02136875130236149
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "URL_of_Anchor",
+      "strength": 0.02121811918914318
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Links_pointing_to_page",
+      "strength": 0.020535923540592194
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "web_traffic",
+      "strength": 0.02037583850324154
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Abnormal_URL",
+      "strength": 0.020183410495519638
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Redirect",
+      "strength": 0.0197637639939785
+    },
+    {
+      "a": "URL_Length",
+      "b": "DNSRecord",
+      "strength": 0.019563280045986176
+    },
+    {
+      "a": "URL_Length",
+      "b": "Links_in_tags",
+      "strength": 0.01956210844218731
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Google_Index",
+      "strength": 0.01927255466580391
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Links_pointing_to_page",
+      "strength": 0.018990736454725266
+    },
+    {
+      "a": "Request_URL",
+      "b": "popUpWidnow",
+      "strength": 0.01896759308874607
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Links_in_tags",
+      "strength": 0.018877826631069183
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Google_Index",
+      "strength": 0.018637586385011673
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Submitting_to_email",
+      "strength": 0.018499130383133888
+    },
+    {
+      "a": "Redirect",
+      "b": "Page_Rank",
+      "strength": 0.018085332587361336
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "web_traffic",
+      "strength": 0.01801391690969467
+    },
+    {
+      "a": "Favicon",
+      "b": "Request_URL",
+      "strength": 0.01785503886640072
+    },
+    {
+      "a": "Redirect",
+      "b": "Links_pointing_to_page",
+      "strength": 0.017848830670118332
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "on_mouseover",
+      "strength": 0.017674105241894722
+    },
+    {
+      "a": "Request_URL",
+      "b": "age_of_domain",
+      "strength": 0.01748008280992508
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "age_of_domain",
+      "strength": 0.01735364831984043
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "URL_of_Anchor",
+      "strength": 0.017337005585432053
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Links_pointing_to_page",
+      "strength": 0.017147447913885117
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Links_in_tags",
+      "strength": 0.017120756208896637
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Redirect",
+      "strength": 0.016947045922279358
+    },
+    {
+      "a": "Favicon",
+      "b": "URL_of_Anchor",
+      "strength": 0.01685304380953312
+    },
+    {
+      "a": "URL_Length",
+      "b": "URL_of_Anchor",
+      "strength": 0.016778482124209404
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Abnormal_URL",
+      "strength": 0.0163916926831007
+    },
+    {
+      "a": "URL_Length",
+      "b": "Redirect",
+      "strength": 0.016375569626688957
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Links_in_tags",
+      "strength": 0.016375530511140823
+    },
+    {
+      "a": "SFH",
+      "b": "popUpWidnow",
+      "strength": 0.0161356870085001
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Page_Rank",
+      "strength": 0.016111355274915695
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "URL_Length",
+      "strength": 0.01571197807788849
+    },
+    {
+      "a": "URL_Length",
+      "b": "SSLfinal_State",
+      "strength": 0.015665195882320404
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "having_At_Symbol",
+      "strength": 0.015583902597427368
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Prefix_Suffix",
+      "strength": 0.015522303991019726
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Submitting_to_email",
+      "strength": 0.0155198248103261
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Google_Index",
+      "strength": 0.0153915761038661
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "URL_of_Anchor",
+      "strength": 0.014931337907910347
+    },
+    {
+      "a": "Google_Index",
+      "b": "Links_pointing_to_page",
+      "strength": 0.014795252121984959
+    },
+    {
+      "a": "SFH",
+      "b": "age_of_domain",
+      "strength": 0.014686045236885548
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "popUpWidnow",
+      "strength": 0.01448159571737051
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "HTTPS_token",
+      "strength": 0.014287236146628857
+    },
+    {
+      "a": "Request_URL",
+      "b": "DNSRecord",
+      "strength": 0.014223076403141022
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "Page_Rank",
+      "strength": 0.014093916863203049
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Google_Index",
+      "strength": 0.01393839344382286
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Redirect",
+      "strength": 0.013865768909454346
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Request_URL",
+      "strength": 0.013688045553863049
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "age_of_domain",
+      "strength": 0.013646559789776802
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Submitting_to_email",
+      "strength": 0.013639119453728199
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Submitting_to_email",
+      "strength": 0.013584843836724758
+    },
+    {
+      "a": "Favicon",
+      "b": "age_of_domain",
+      "strength": 0.013472307473421097
+    },
+    {
+      "a": "URL_Length",
+      "b": "having_Sub_Domain",
+      "strength": 0.013304867781698704
+    },
+    {
+      "a": "URL_Length",
+      "b": "Favicon",
+      "strength": 0.013109943829476833
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Google_Index",
+      "strength": 0.012988689355552197
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "DNSRecord",
+      "strength": 0.01279187761247158
+    },
+    {
+      "a": "Request_URL",
+      "b": "Google_Index",
+      "strength": 0.012707590125501156
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "DNSRecord",
+      "strength": 0.012701663188636303
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "SSLfinal_State",
+      "strength": 0.012627815827727318
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Submitting_to_email",
+      "strength": 0.012599242851138115
+    },
+    {
+      "a": "Redirect",
+      "b": "web_traffic",
+      "strength": 0.012580356560647488
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "HTTPS_token",
+      "strength": 0.012398919090628624
+    },
+    {
+      "a": "URL_Length",
+      "b": "Domain_registeration_length",
+      "strength": 0.012383583933115005
+    },
+    {
+      "a": "Request_URL",
+      "b": "Iframe",
+      "strength": 0.01221749559044838
+    },
+    {
+      "a": "Request_URL",
+      "b": "on_mouseover",
+      "strength": 0.01220871414989233
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "web_traffic",
+      "strength": 0.012139922007918358
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "web_traffic",
+      "strength": 0.011919889599084854
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Redirect",
+      "strength": 0.011705338023602962
+    },
+    {
+      "a": "URL_Length",
+      "b": "Google_Index",
+      "strength": 0.011387160047888756
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "HTTPS_token",
+      "strength": 0.011364972218871117
+    },
+    {
+      "a": "on_mouseover",
+      "b": "Links_pointing_to_page",
+      "strength": 0.011094867251813412
+    },
+    {
+      "a": "Favicon",
+      "b": "popUpWidnow",
+      "strength": 0.011067765764892101
+    },
+    {
+      "a": "URL_Length",
+      "b": "Page_Rank",
+      "strength": 0.011047879233956337
+    },
+    {
+      "a": "URL_Length",
+      "b": "having_At_Symbol",
+      "strength": 0.010946746915578842
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Domain_registeration_length",
+      "strength": 0.010723191313445568
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "on_mouseover",
+      "strength": 0.010689753107726574
+    },
+    {
+      "a": "Favicon",
+      "b": "Links_pointing_to_page",
+      "strength": 0.010554674081504345
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "popUpWidnow",
+      "strength": 0.010492628440260887
+    },
+    {
+      "a": "port",
+      "b": "popUpWidnow",
+      "strength": 0.010452981106936932
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "web_traffic",
+      "strength": 0.010443335399031639
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Submitting_to_email",
+      "strength": 0.010392227210104465
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Submitting_to_email",
+      "strength": 0.01032366044819355
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "URL_of_Anchor",
+      "strength": 0.010276365093886852
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "having_Sub_Domain",
+      "strength": 0.010091141797602177
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "double_slash_redirecting",
+      "strength": 0.010044905357062817
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Redirect",
+      "strength": 0.009707705117762089
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "having_Sub_Domain",
+      "strength": 0.009677547961473465
+    },
+    {
+      "a": "Iframe",
+      "b": "web_traffic",
+      "strength": 0.00960660818964243
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "having_Sub_Domain",
+      "strength": 0.009514263831079006
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "on_mouseover",
+      "strength": 0.009382772259414196
+    },
+    {
+      "a": "URL_Length",
+      "b": "age_of_domain",
+      "strength": 0.009041155688464642
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "Links_pointing_to_page",
+      "strength": 0.009005081839859486
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Favicon",
+      "strength": 0.0089549096301198
+    },
+    {
+      "a": "SFH",
+      "b": "Page_Rank",
+      "strength": 0.008937823586165905
+    },
+    {
+      "a": "URL_Length",
+      "b": "popUpWidnow",
+      "strength": 0.008795076049864292
+    },
+    {
+      "a": "Page_Rank",
+      "b": "Links_pointing_to_page",
+      "strength": 0.008699276484549046
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "on_mouseover",
+      "strength": 0.00852023996412754
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "age_of_domain",
+      "strength": 0.008325980044901371
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Request_URL",
+      "strength": 0.008302276954054832
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Google_Index",
+      "strength": 0.00826228316873312
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Abnormal_URL",
+      "strength": 0.008115716278553009
+    },
+    {
+      "a": "port",
+      "b": "Links_pointing_to_page",
+      "strength": 0.008082631975412369
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "SSLfinal_State",
+      "strength": 0.008070545271039009
+    },
+    {
+      "a": "DNSRecord",
+      "b": "Statistical_report",
+      "strength": 0.008050205186009407
+    },
+    {
+      "a": "Favicon",
+      "b": "Submitting_to_email",
+      "strength": 0.007969953119754791
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Google_Index",
+      "strength": 0.00788362231105566
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Redirect",
+      "strength": 0.007824433036148548
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Links_pointing_to_page",
+      "strength": 0.007807290647178888
+    },
+    {
+      "a": "SFH",
+      "b": "Abnormal_URL",
+      "strength": 0.007731253281235695
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Page_Rank",
+      "strength": 0.007677839603275061
+    },
+    {
+      "a": "Favicon",
+      "b": "port",
+      "strength": 0.007600329350680113
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Domain_registeration_length",
+      "strength": 0.0074519687332212925
+    },
+    {
+      "a": "URL_Length",
+      "b": "Abnormal_URL",
+      "strength": 0.007412308361381292
+    },
+    {
+      "a": "Request_URL",
+      "b": "SFH",
+      "strength": 0.007339253555983305
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Request_URL",
+      "strength": 0.007327241823077202
+    },
+    {
+      "a": "Redirect",
+      "b": "DNSRecord",
+      "strength": 0.0072609675116837025
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Google_Index",
+      "strength": 0.00723990797996521
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Page_Rank",
+      "strength": 0.007136894389986992
+    },
+    {
+      "a": "port",
+      "b": "URL_of_Anchor",
+      "strength": 0.007127278950065374
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Prefix_Suffix",
+      "strength": 0.00712092500180006
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Abnormal_URL",
+      "strength": 0.007109129335731268
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "age_of_domain",
+      "strength": 0.006951936986297369
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "port",
+      "strength": 0.006928297225385904
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "SFH",
+      "strength": 0.006845870055258274
+    },
+    {
+      "a": "SFH",
+      "b": "Statistical_report",
+      "strength": 0.006731020752340555
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Iframe",
+      "strength": 0.006719766650348902
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "web_traffic",
+      "strength": 0.00654345378279686
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Submitting_to_email",
+      "strength": 0.006459720898419619
+    },
+    {
+      "a": "URL_Length",
+      "b": "Statistical_report",
+      "strength": 0.0064562661573290825
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "HTTPS_token",
+      "strength": 0.006419450510293245
+    },
+    {
+      "a": "Favicon",
+      "b": "Links_in_tags",
+      "strength": 0.006311875768005848
+    },
+    {
+      "a": "on_mouseover",
+      "b": "web_traffic",
+      "strength": 0.006269377656280994
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "port",
+      "strength": 0.006195820402354002
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "DNSRecord",
+      "strength": 0.006129550281912088
+    },
+    {
+      "a": "Favicon",
+      "b": "Iframe",
+      "strength": 0.006072962656617165
+    },
+    {
+      "a": "Request_URL",
+      "b": "Submitting_to_email",
+      "strength": 0.006042525637894869
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "age_of_domain",
+      "strength": 0.005915590096265078
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "Iframe",
+      "strength": 0.005884411744773388
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "on_mouseover",
+      "strength": 0.00585074070841074
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "web_traffic",
+      "strength": 0.005714749917387962
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Iframe",
+      "strength": 0.005506944842636585
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "HTTPS_token",
+      "strength": 0.005390811711549759
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Favicon",
+      "strength": 0.0053796847350895405
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Redirect",
+      "strength": 0.0053369877859950066
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "popUpWidnow",
+      "strength": 0.005332601722329855
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Redirect",
+      "strength": 0.005286433268338442
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Shortining_Service",
+      "strength": 0.005058400798588991
+    },
+    {
+      "a": "URL_Length",
+      "b": "HTTPS_token",
+      "strength": 0.005008527543395758
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Google_Index",
+      "strength": 0.004969308152794838
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Abnormal_URL",
+      "strength": 0.00486648129299283
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Abnormal_URL",
+      "strength": 0.004865208175033331
+    },
+    {
+      "a": "Redirect",
+      "b": "Google_Index",
+      "strength": 0.004845800343900919
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "RightClick",
+      "strength": 0.0048352633602917194
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "popUpWidnow",
+      "strength": 0.004788645077496767
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "Statistical_report",
+      "strength": 0.0047461953945457935
+    },
+    {
+      "a": "SFH",
+      "b": "Redirect",
+      "strength": 0.004703026730567217
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Favicon",
+      "strength": 0.004661921411752701
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Page_Rank",
+      "strength": 0.0046602278016507626
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Links_pointing_to_page",
+      "strength": 0.004568070638924837
+    },
+    {
+      "a": "URL_of_Anchor",
+      "b": "Statistical_report",
+      "strength": 0.004511021543294191
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Links_pointing_to_page",
+      "strength": 0.0044359550811350346
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "popUpWidnow",
+      "strength": 0.0043668802827596664
+    },
+    {
+      "a": "on_mouseover",
+      "b": "popUpWidnow",
+      "strength": 0.004335426259785891
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Favicon",
+      "strength": 0.004334575030952692
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "popUpWidnow",
+      "strength": 0.004321045707911253
+    },
+    {
+      "a": "URL_Length",
+      "b": "Prefix_Suffix",
+      "strength": 0.004320536274462938
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "Statistical_report",
+      "strength": 0.004222739487886429
+    },
+    {
+      "a": "Links_pointing_to_page",
+      "b": "Statistical_report",
+      "strength": 0.004222635179758072
+    },
+    {
+      "a": "SFH",
+      "b": "Google_Index",
+      "strength": 0.0041431160643696785
+    },
+    {
+      "a": "age_of_domain",
+      "b": "Statistical_report",
+      "strength": 0.0041006444953382015
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Links_in_tags",
+      "strength": 0.004036364145576954
+    },
+    {
+      "a": "port",
+      "b": "DNSRecord",
+      "strength": 0.004010715056210756
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Page_Rank",
+      "strength": 0.003962844144552946
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "DNSRecord",
+      "strength": 0.003900462295860052
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Redirect",
+      "strength": 0.003849558299407363
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Statistical_report",
+      "strength": 0.0038177501410245895
+    },
+    {
+      "a": "Favicon",
+      "b": "web_traffic",
+      "strength": 0.003732881275936961
+    },
+    {
+      "a": "SFH",
+      "b": "Submitting_to_email",
+      "strength": 0.003726779017597437
+    },
+    {
+      "a": "SSLfinal_State",
+      "b": "RightClick",
+      "strength": 0.0036303165834397078
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "age_of_domain",
+      "strength": 0.0036036332603543997
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "DNSRecord",
+      "strength": 0.003554827068001032
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Iframe",
+      "strength": 0.0033954849932342768
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "on_mouseover",
+      "strength": 0.0033717870246618986
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Redirect",
+      "strength": 0.003349527483806014
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Abnormal_URL",
+      "strength": 0.003321911208331585
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "DNSRecord",
+      "strength": 0.0032749369274824858
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Request_URL",
+      "strength": 0.0032538152299821377
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Google_Index",
+      "strength": 0.003248861525207758
+    },
+    {
+      "a": "URL_Length",
+      "b": "double_slash_redirecting",
+      "strength": 0.0032412598375231028
+    },
+    {
+      "a": "port",
+      "b": "Links_in_tags",
+      "strength": 0.003202781081199646
+    },
+    {
+      "a": "URL_Length",
+      "b": "Request_URL",
+      "strength": 0.003104207804426551
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Submitting_to_email",
+      "strength": 0.003062128322198987
+    },
+    {
+      "a": "Request_URL",
+      "b": "Redirect",
+      "strength": 0.003055715234950185
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Statistical_report",
+      "strength": 0.0030469566117972136
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "Iframe",
+      "strength": 0.00302155502140522
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Abnormal_URL",
+      "strength": 0.0029140126425772905
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "popUpWidnow",
+      "strength": 0.0029099341481924057
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Page_Rank",
+      "strength": 0.0028982528019696474
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "port",
+      "strength": 0.0028858515433967113
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Favicon",
+      "strength": 0.0028854242991656065
+    },
+    {
+      "a": "Favicon",
+      "b": "Google_Index",
+      "strength": 0.002885150257498026
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Abnormal_URL",
+      "strength": 0.002869528252631426
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Favicon",
+      "strength": 0.0028577949851751328
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Google_Index",
+      "strength": 0.0028401317540556192
+    },
+    {
+      "a": "Favicon",
+      "b": "DNSRecord",
+      "strength": 0.0027233781293034554
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Prefix_Suffix",
+      "strength": 0.00271002110093832
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "popUpWidnow",
+      "strength": 0.002694506663829088
+    },
+    {
+      "a": "Redirect",
+      "b": "age_of_domain",
+      "strength": 0.0026567799504846334
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Abnormal_URL",
+      "strength": 0.0026432981248944998
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "web_traffic",
+      "strength": 0.002609956543892622
+    },
+    {
+      "a": "popUpWidnow",
+      "b": "Google_Index",
+      "strength": 0.0025607249699532986
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Prefix_Suffix",
+      "strength": 0.002558118663728237
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "age_of_domain",
+      "strength": 0.0025570800062268972
+    },
+    {
+      "a": "on_mouseover",
+      "b": "DNSRecord",
+      "strength": 0.002510319696739316
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "DNSRecord",
+      "strength": 0.002508892212063074
+    },
+    {
+      "a": "port",
+      "b": "Request_URL",
+      "strength": 0.0025073096621781588
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "on_mouseover",
+      "strength": 0.0024157636798918247
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "SFH",
+      "strength": 0.0024120553862303495
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Abnormal_URL",
+      "strength": 0.002409200184047222
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "Statistical_report",
+      "strength": 0.0024066062178462744
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "SFH",
+      "strength": 0.0023990096524357796
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "DNSRecord",
+      "strength": 0.002398204058408737
+    },
+    {
+      "a": "Links_in_tags",
+      "b": "RightClick",
+      "strength": 0.0023455882910639048
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Abnormal_URL",
+      "strength": 0.002326086163520813
+    },
+    {
+      "a": "port",
+      "b": "SFH",
+      "strength": 0.00231452495791018
+    },
+    {
+      "a": "Page_Rank",
+      "b": "Statistical_report",
+      "strength": 0.0023032864555716515
+    },
+    {
+      "a": "port",
+      "b": "Submitting_to_email",
+      "strength": 0.0023018023930490017
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Request_URL",
+      "strength": 0.002300516702234745
+    },
+    {
+      "a": "Favicon",
+      "b": "Abnormal_URL",
+      "strength": 0.0022867494262754917
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Domain_registeration_length",
+      "strength": 0.0022421497851610184
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "popUpWidnow",
+      "strength": 0.002196535235270858
+    },
+    {
+      "a": "Iframe",
+      "b": "Links_pointing_to_page",
+      "strength": 0.0021216506138443947
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "HTTPS_token",
+      "strength": 0.0021199092734605074
+    },
+    {
+      "a": "SFH",
+      "b": "on_mouseover",
+      "strength": 0.0021084926556795835
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Redirect",
+      "strength": 0.0020531106274574995
+    },
+    {
+      "a": "RightClick",
+      "b": "web_traffic",
+      "strength": 0.0020354564767330885
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "age_of_domain",
+      "strength": 0.0020344755612313747
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "DNSRecord",
+      "strength": 0.0020181036088615656
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Page_Rank",
+      "strength": 0.0020017544738948345
+    },
+    {
+      "a": "Favicon",
+      "b": "Page_Rank",
+      "strength": 0.0019923823419958353
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Statistical_report",
+      "strength": 0.0019520159112289548
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "Statistical_report",
+      "strength": 0.0019509269623085856
+    },
+    {
+      "a": "Favicon",
+      "b": "SFH",
+      "strength": 0.0018905954202637076
+    },
+    {
+      "a": "port",
+      "b": "Google_Index",
+      "strength": 0.001884013065136969
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "HTTPS_token",
+      "strength": 0.0018765401327982545
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Statistical_report",
+      "strength": 0.001822985359467566
+    },
+    {
+      "a": "SFH",
+      "b": "Iframe",
+      "strength": 0.0018212541472166777
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "SFH",
+      "strength": 0.0018040798604488373
+    },
+    {
+      "a": "Request_URL",
+      "b": "Statistical_report",
+      "strength": 0.0017654113471508026
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "age_of_domain",
+      "strength": 0.0017398823983967304
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Redirect",
+      "strength": 0.0017395691247656941
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "Iframe",
+      "strength": 0.0017192054074257612
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "Iframe",
+      "strength": 0.0017074686475098133
+    },
+    {
+      "a": "port",
+      "b": "on_mouseover",
+      "strength": 0.0016804540064185858
+    },
+    {
+      "a": "port",
+      "b": "web_traffic",
+      "strength": 0.0016319240676239133
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "port",
+      "strength": 0.0016311141662299633
+    },
+    {
+      "a": "port",
+      "b": "Page_Rank",
+      "strength": 0.001608884078450501
+    },
+    {
+      "a": "port",
+      "b": "age_of_domain",
+      "strength": 0.001561740878969431
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "on_mouseover",
+      "strength": 0.0015448833582922816
+    },
+    {
+      "a": "on_mouseover",
+      "b": "Statistical_report",
+      "strength": 0.0015043242601677775
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Statistical_report",
+      "strength": 0.001491580274887383
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Page_Rank",
+      "strength": 0.001472366158850491
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Request_URL",
+      "strength": 0.0014610392972826958
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "having_At_Symbol",
+      "strength": 0.0013737123226746917
+    },
+    {
+      "a": "Google_Index",
+      "b": "Statistical_report",
+      "strength": 0.0013105139369145036
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Favicon",
+      "strength": 0.001259312150068581
+    },
+    {
+      "a": "Favicon",
+      "b": "HTTPS_token",
+      "strength": 0.0012198310578241944
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Submitting_to_email",
+      "strength": 0.0012033472303301096
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "popUpWidnow",
+      "strength": 0.001192276133224368
+    },
+    {
+      "a": "RightClick",
+      "b": "Statistical_report",
+      "strength": 0.0011862112442031503
+    },
+    {
+      "a": "Favicon",
+      "b": "on_mouseover",
+      "strength": 0.0011815744219347835
+    },
+    {
+      "a": "Redirect",
+      "b": "popUpWidnow",
+      "strength": 0.0011656919959932566
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "on_mouseover",
+      "strength": 0.0011573280207812786
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Iframe",
+      "strength": 0.001112467609345913
+    },
+    {
+      "a": "Request_URL",
+      "b": "RightClick",
+      "strength": 0.001109489006921649
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "port",
+      "strength": 0.0010867899982258677
+    },
+    {
+      "a": "Iframe",
+      "b": "Statistical_report",
+      "strength": 0.0010465560480952263
+    },
+    {
+      "a": "port",
+      "b": "HTTPS_token",
+      "strength": 0.0010412964038550854
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Google_Index",
+      "strength": 0.001036625704728067
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "double_slash_redirecting",
+      "strength": 0.0010149580193683505
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "HTTPS_token",
+      "strength": 0.0010096566984429955
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "popUpWidnow",
+      "strength": 0.0010076217586174607
+    },
+    {
+      "a": "Iframe",
+      "b": "DNSRecord",
+      "strength": 0.0009837861871346831
+    },
+    {
+      "a": "Request_URL",
+      "b": "Abnormal_URL",
+      "strength": 0.0009675052715465426
+    },
+    {
+      "a": "on_mouseover",
+      "b": "RightClick",
+      "strength": 0.0009620354976505041
+    },
+    {
+      "a": "URL_Length",
+      "b": "port",
+      "strength": 0.0009612199501134455
+    },
+    {
+      "a": "URL_Length",
+      "b": "on_mouseover",
+      "strength": 0.0009601328638382256
+    },
+    {
+      "a": "Redirect",
+      "b": "Statistical_report",
+      "strength": 0.0009486218332313001
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "RightClick",
+      "strength": 0.0009221959626302123
+    },
+    {
+      "a": "URL_Length",
+      "b": "Iframe",
+      "strength": 0.0009150393889285624
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Iframe",
+      "strength": 0.000902108324225992
+    },
+    {
+      "a": "on_mouseover",
+      "b": "age_of_domain",
+      "strength": 0.0008996626711450517
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Redirect",
+      "strength": 0.0008859299123287201
+    },
+    {
+      "a": "on_mouseover",
+      "b": "Page_Rank",
+      "strength": 0.0008453413029201329
+    },
+    {
+      "a": "Favicon",
+      "b": "Statistical_report",
+      "strength": 0.0008010541787371039
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Statistical_report",
+      "strength": 0.0007981237140484154
+    },
+    {
+      "a": "having_Sub_Domain",
+      "b": "port",
+      "strength": 0.0007822793559171259
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Favicon",
+      "strength": 0.0007489954004995525
+    },
+    {
+      "a": "Favicon",
+      "b": "RightClick",
+      "strength": 0.0007396943983621895
+    },
+    {
+      "a": "port",
+      "b": "Statistical_report",
+      "strength": 0.0007188634481281042
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Domain_registeration_length",
+      "strength": 0.0006868391647003591
+    },
+    {
+      "a": "Iframe",
+      "b": "age_of_domain",
+      "strength": 0.0006754127680324018
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "on_mouseover",
+      "strength": 0.0006523278425447643
+    },
+    {
+      "a": "Favicon",
+      "b": "Redirect",
+      "strength": 0.0006495985435321927
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Domain_registeration_length",
+      "strength": 0.00064831756753847
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "Statistical_report",
+      "strength": 0.0006463000900112092
+    },
+    {
+      "a": "RightClick",
+      "b": "Links_pointing_to_page",
+      "strength": 0.0006084195920266211
+    },
+    {
+      "a": "RightClick",
+      "b": "popUpWidnow",
+      "strength": 0.0006071398383937776
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Submitting_to_email",
+      "strength": 0.0005960080889053643
+    },
+    {
+      "a": "Domain_registeration_length",
+      "b": "RightClick",
+      "strength": 0.0005880544194951653
+    },
+    {
+      "a": "Iframe",
+      "b": "Google_Index",
+      "strength": 0.0005814493633806705
+    },
+    {
+      "a": "RightClick",
+      "b": "Page_Rank",
+      "strength": 0.0005598155548796058
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Statistical_report",
+      "strength": 0.0005507671739906073
+    },
+    {
+      "a": "RightClick",
+      "b": "age_of_domain",
+      "strength": 0.0005147221963852644
+    },
+    {
+      "a": "on_mouseover",
+      "b": "Google_Index",
+      "strength": 0.000501456088386476
+    },
+    {
+      "a": "RightClick",
+      "b": "Google_Index",
+      "strength": 0.0004921451909467578
+    },
+    {
+      "a": "RightClick",
+      "b": "DNSRecord",
+      "strength": 0.0004886796814389527
+    },
+    {
+      "a": "port",
+      "b": "Iframe",
+      "strength": 0.0004238551191519946
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "on_mouseover",
+      "strength": 0.00040069158421829343
+    },
+    {
+      "a": "Redirect",
+      "b": "on_mouseover",
+      "strength": 0.00038244054303504527
+    },
+    {
+      "a": "on_mouseover",
+      "b": "Iframe",
+      "strength": 0.00036937673576176167
+    },
+    {
+      "a": "port",
+      "b": "Abnormal_URL",
+      "strength": 0.0003623564844019711
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "Statistical_report",
+      "strength": 0.00034175682230852544
+    },
+    {
+      "a": "port",
+      "b": "RightClick",
+      "strength": 0.0003328887978568673
+    },
+    {
+      "a": "SFH",
+      "b": "RightClick",
+      "strength": 0.000325248867738992
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "Iframe",
+      "strength": 0.0003189627022948116
+    },
+    {
+      "a": "having_IP_Address",
+      "b": "RightClick",
+      "strength": 0.00030847275047563016
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "on_mouseover",
+      "strength": 0.0002976871910504997
+    },
+    {
+      "a": "Prefix_Suffix",
+      "b": "RightClick",
+      "strength": 0.0002938226971309632
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "on_mouseover",
+      "strength": 0.0002746321843005717
+    },
+    {
+      "a": "port",
+      "b": "Redirect",
+      "strength": 0.00024702720111235976
+    },
+    {
+      "a": "Iframe",
+      "b": "Page_Rank",
+      "strength": 0.00023077547666616738
+    },
+    {
+      "a": "Submitting_to_email",
+      "b": "RightClick",
+      "strength": 0.00022455997532233596
+    },
+    {
+      "a": "RightClick",
+      "b": "Iframe",
+      "strength": 0.0001903372467495501
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "RightClick",
+      "strength": 0.00018819206161424518
+    },
+    {
+      "a": "Redirect",
+      "b": "Iframe",
+      "strength": 0.00017307318921666592
+    },
+    {
+      "a": "having_At_Symbol",
+      "b": "RightClick",
+      "strength": 0.00016017576854210347
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "port",
+      "strength": 0.00012834655353799462
+    },
+    {
+      "a": "double_slash_redirecting",
+      "b": "RightClick",
+      "strength": 0.00012596817396115512
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "port",
+      "strength": 0.00011154520325362682
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "RightClick",
+      "strength": 9.597239113645628e-05
+    },
+    {
+      "a": "Shortining_Service",
+      "b": "Iframe",
+      "strength": 9.36192154767923e-05
+    },
+    {
+      "a": "URL_Length",
+      "b": "RightClick",
+      "strength": 8.594085375079885e-05
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "Iframe",
+      "strength": 6.336186197586358e-05
+    },
+    {
+      "a": "HTTPS_token",
+      "b": "RightClick",
+      "strength": 4.8687081289244816e-05
+    },
+    {
+      "a": "Abnormal_URL",
+      "b": "Iframe",
+      "strength": 4.38950773968827e-05
+    },
+    {
+      "a": "Redirect",
+      "b": "RightClick",
+      "strength": 0.0
+    }
+  ],
+  "reversed_features": [
+    "Shortining_Service",
+    "double_slash_redirecting",
+    "Domain_registeration_length",
+    "HTTPS_token",
+    "Abnormal_URL",
+    "Redirect",
+    "Links_pointing_to_page"
+  ],
+  "no_signal_features": [
+    "Favicon",
+    "popUpWidnow",
+    "Iframe"
+  ],
+  "encoding_audit": [
+    {
+      "feature": "having_IP_Address",
+      "P(phish|-1)": 0.508,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.409,
+      "risk_drop": 0.099,
+      "verdict": "as documented",
+      "documented -1 means": "Hostname is a raw IP address"
+    },
+    {
+      "feature": "URL_Length",
+      "P(phish|-1)": 0.455,
+      "P(phish|+0)": 0.615,
+      "P(phish|+1)": 0.376,
+      "risk_drop": 0.08,
+      "verdict": "as documented",
+      "documented -1 means": "75+ characters"
+    },
+    {
+      "feature": "Shortining_Service",
+      "P(phish|-1)": 0.356,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.456,
+      "risk_drop": -0.1,
+      "verdict": "reversed",
+      "documented -1 means": "Uses a shortening service"
+    },
+    {
+      "feature": "having_At_Symbol",
+      "P(phish|-1)": 0.506,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.432,
+      "risk_drop": 0.074,
+      "verdict": "as documented",
+      "documented -1 means": "Contains an @ symbol"
+    },
+    {
+      "feature": "double_slash_redirecting",
+      "P(phish|-1)": 0.393,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.45,
+      "risk_drop": -0.057,
+      "verdict": "reversed",
+      "documented -1 means": "// appears late in the URL"
+    },
+    {
+      "feature": "Prefix_Suffix",
+      "P(phish|-1)": 0.511,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.0,
+      "risk_drop": 0.511,
+      "verdict": "as documented",
+      "documented -1 means": "Domain contains a hyphen"
+    },
+    {
+      "feature": "having_Sub_Domain",
+      "P(phish|-1)": 0.546,
+      "P(phish|+0)": 0.622,
+      "P(phish|+1)": 0.199,
+      "risk_drop": 0.347,
+      "verdict": "as documented",
+      "documented -1 means": "Multiple subdomains"
+    },
+    {
+      "feature": "SSLfinal_State",
+      "P(phish|-1)": 0.858,
+      "P(phish|+0)": 0.982,
+      "P(phish|+1)": 0.111,
+      "risk_drop": 0.747,
+      "verdict": "as documented",
+      "documented -1 means": "No HTTPS or invalid certificate"
+    },
+    {
+      "feature": "Domain_registeration_length",
+      "P(phish|-1)": 0.364,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.602,
+      "risk_drop": -0.238,
+      "verdict": "reversed",
+      "documented -1 means": "Expires within a year"
+    },
+    {
+      "feature": "Favicon",
+      "P(phish|-1)": 0.443,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.443,
+      "risk_drop": -0.0,
+      "verdict": "no marginal signal",
+      "documented -1 means": "Favicon loaded off-domain"
+    },
+    {
+      "feature": "port",
+      "P(phish|-1)": 0.489,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.436,
+      "risk_drop": 0.053,
+      "verdict": "as documented",
+      "documented -1 means": "Non-preferred ports open"
+    },
+    {
+      "feature": "HTTPS_token",
+      "P(phish|-1)": 0.398,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.452,
+      "risk_drop": -0.054,
+      "verdict": "reversed",
+      "documented -1 means": "'https' appears in the hostname"
+    },
+    {
+      "feature": "Request_URL",
+      "P(phish|-1)": 0.595,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.339,
+      "risk_drop": 0.256,
+      "verdict": "as documented",
+      "documented -1 means": "61%+ external"
+    },
+    {
+      "feature": "URL_of_Anchor",
+      "P(phish|-1)": 0.989,
+      "P(phish|+0)": 0.281,
+      "P(phish|+1)": 0.062,
+      "risk_drop": 0.927,
+      "verdict": "as documented",
+      "documented -1 means": "67%+ off-domain or empty"
+    },
+    {
+      "feature": "Links_in_tags",
+      "P(phish|-1)": 0.603,
+      "P(phish|+0)": 0.392,
+      "P(phish|+1)": 0.289,
+      "risk_drop": 0.314,
+      "verdict": "as documented",
+      "documented -1 means": "81%+ external"
+    },
+    {
+      "feature": "SFH",
+      "P(phish|-1)": 0.502,
+      "P(phish|+0)": 0.346,
+      "P(phish|+1)": 0.214,
+      "risk_drop": 0.288,
+      "verdict": "as documented",
+      "documented -1 means": "Blank or about:blank action"
+    },
+    {
+      "feature": "Submitting_to_email",
+      "P(phish|-1)": 0.462,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.439,
+      "risk_drop": 0.023,
+      "verdict": "as documented",
+      "documented -1 means": "Uses mailto: or mail()"
+    },
+    {
+      "feature": "Abnormal_URL",
+      "P(phish|-1)": 0.371,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.456,
+      "risk_drop": -0.085,
+      "verdict": "reversed",
+      "documented -1 means": "Hostname not found in WHOIS record"
+    },
+    {
+      "feature": "Redirect",
+      "P(phish|-1)": NaN,
+      "P(phish|+0)": 0.439,
+      "P(phish|+1)": 0.471,
+      "risk_drop": -0.031,
+      "verdict": "reversed",
+      "documented -1 means": "n/a"
+    },
+    {
+      "feature": "on_mouseover",
+      "P(phish|-1)": 0.5,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.435,
+      "risk_drop": 0.064,
+      "verdict": "as documented",
+      "documented -1 means": "Status bar is rewritten"
+    },
+    {
+      "feature": "RightClick",
+      "P(phish|-1)": 0.473,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.442,
+      "risk_drop": 0.031,
+      "verdict": "as documented",
+      "documented -1 means": "Right-click disabled"
+    },
+    {
+      "feature": "popUpWidnow",
+      "P(phish|-1)": 0.443,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.443,
+      "risk_drop": 0.0,
+      "verdict": "no marginal signal",
+      "documented -1 means": "Pop-up requests input"
+    },
+    {
+      "feature": "Iframe",
+      "P(phish|-1)": 0.438,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.444,
+      "risk_drop": -0.006,
+      "verdict": "no marginal signal",
+      "documented -1 means": "Borderless iframe present"
+    },
+    {
+      "feature": "age_of_domain",
+      "P(phish|-1)": 0.507,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.386,
+      "risk_drop": 0.121,
+      "verdict": "as documented",
+      "documented -1 means": "Younger than 6 months"
+    },
+    {
+      "feature": "DNSRecord",
+      "P(phish|-1)": 0.499,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.418,
+      "risk_drop": 0.081,
+      "verdict": "as documented",
+      "documented -1 means": "No DNS or WHOIS record"
+    },
+    {
+      "feature": "web_traffic",
+      "P(phish|-1)": 0.63,
+      "P(phish|+0)": 0.669,
+      "P(phish|+1)": 0.258,
+      "risk_drop": 0.372,
+      "verdict": "as documented",
+      "documented -1 means": "No rank at all"
+    },
+    {
+      "feature": "Page_Rank",
+      "P(phish|-1)": 0.474,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.355,
+      "risk_drop": 0.119,
+      "verdict": "as documented",
+      "documented -1 means": "PageRank under 0.2"
+    },
+    {
+      "feature": "Google_Index",
+      "P(phish|-1)": 0.602,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.417,
+      "risk_drop": 0.185,
+      "verdict": "as documented",
+      "documented -1 means": "Not indexed"
+    },
+    {
+      "feature": "Links_pointing_to_page",
+      "P(phish|-1)": 0.352,
+      "P(phish|+0)": 0.476,
+      "P(phish|+1)": 0.408,
+      "risk_drop": -0.056,
+      "verdict": "reversed",
+      "documented -1 means": "No inbound links"
+    },
+    {
+      "feature": "Statistical_report",
+      "P(phish|-1)": 0.541,
+      "P(phish|+0)": NaN,
+      "P(phish|+1)": 0.427,
+      "risk_drop": 0.114,
+      "verdict": "as documented",
+      "documented -1 means": "Listed on a phishing blocklist"
+    }
+  ]
+}
