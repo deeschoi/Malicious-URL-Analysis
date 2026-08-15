@@ -138,23 +138,46 @@ Phishing detection here is supervised binary classification on a fixed, already-
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .              # makes `phishing` importable everywhere
 
 # lock the EDA numbers, URL/HTML extractors, and ML helpers
-PYTHONPATH=src pytest tests -m "not network"
+pytest -m "not network"
 
 # leakage-delta table → reports/leakage_delta.csv
-PYTHONPATH=src python -m phishing.cli evaluate
+phishing evaluate
 
 # train the 25-feature model, write Stage 2–3 reports, save artifacts/model.joblib
-PYTHONPATH=src python -m phishing.cli train --tune
+phishing train --tune
 
 # score a URL (tier A is offline; B fetches HTML; full adds TLS/WHOIS/DNS)
-PYTHONPATH=src python -m phishing.cli scan --tier A https://example.com
+phishing scan --tier A https://example.com
 # equivalent: python run.py scan --tier A https://example.com
 
 # Tier-A drift vs the 2012 legitimate class
-PYTHONPATH=src python -m phishing.cli validate
+phishing validate
 ```
+
+Research scripts write their tables and figures to `reports/`, and the model the
+API serves to `artifacts/model.joblib`:
+
+```bash
+python analysis/01_grouped_evaluation.py     # leakage: random vs grouped split
+python analysis/02_calibration_thresholds.py # Brier, Platt, cost-optimal cutoffs
+python analysis/03_shap_explanations.py      # SHAP vs Gini, encoding audit
+python analysis/04_obsolescence.py           # accuracy under 2026 feature loss
+python analysis/05_minimal_features.py       # greedy forward selection (slow)
+python analysis/06_train_final.py            # persist artifacts/model.joblib
+```
+
+### Local website
+
+The scanner UI is not hosted anywhere. After the venv is active and `artifacts/model.joblib` exists (`phishing train --tune` if you have not trained yet):
+
+```bash
+PYTHONPATH=src uvicorn api.main:app --reload --port 8000
+```
+
+If you ran `pip install -e .`, you can drop `PYTHONPATH=src`. Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. You should see **Phishing URL Scanner** with a URL field and a **Research findings** tab. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
 
 Narrative notebooks that import the same package: [`notebooks/01_honest_baseline.ipynb`](notebooks/01_honest_baseline.ipynb), [`notebooks/02_feature_decay.ipynb`](notebooks/02_feature_decay.ipynb), [`notebooks/03_rule_mining.ipynb`](notebooks/03_rule_mining.ipynb).
 
@@ -173,10 +196,15 @@ src/phishing/
   explain.py                  SHAP
   mining.py                   FP-Growth, k-modes, surrogate tree
   cli.py                      evaluate | train | scan | validate
+  io.py                       JSON writers shared by the analysis scripts
+  scanner.py                  live scan → verdict, SHAP signals, coverage
   features/                   live extractor (fetch, URL, HTML, TLS/WHOIS)
+analysis/                     numbered research scripts → reports/
+api/main.py                   FastAPI service (scan, model, findings, health)
+web/                          vanilla JS scanner UI served by the API
 tests/                        pytest, network tests marked skippable
 notebooks/                    stages 1–3 narrative
-reports/                      CSV / text artifacts from train + evaluate
+reports/                      CSV / JSON / figures from the analysis scripts
 artifacts/model.joblib        fitted 25-feature model (gitignored; run train)
 ```
 

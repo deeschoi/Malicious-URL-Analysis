@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""Repo-root entry point so you do not have to set PYTHONPATH."""
+"""Repo-root entry point. Equivalent to the installed ``phishing`` console script."""
 
 from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from phishing.cli import main
 

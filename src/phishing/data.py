@@ -123,6 +123,40 @@ def grouped_split(
     )
 
 
+def leakage_report(
+    X: pd.DataFrame,
+    y: pd.Series,
+    test_size: float = TEST_SIZE,
+    random_state: int = RANDOM_STATE,
+) -> dict[str, float | int]:
+    """Quantify how much a naive random split leaks.
+
+    Measures the fraction of test rows whose exact feature pattern also appears
+    in the training partition, which is the mechanism that inflates the accuracy
+    reported in the original notebook.
+    """
+    groups = pattern_group_ids(X)
+    idx = np.arange(len(X))
+    train_idx, test_idx = train_test_split(
+        idx, test_size=test_size, stratify=y.to_numpy(), random_state=random_state
+    )
+    train_patterns = set(groups[train_idx].tolist())
+    seen = np.isin(groups[test_idx], list(train_patterns))
+
+    label_nunique = pd.DataFrame({"g": groups, "y": y.to_numpy()}).groupby("g")["y"].nunique()
+    n_conflicting = int((label_nunique > 1).sum())
+    n_unique = int(pd.Series(groups).nunique())
+
+    return {
+        "n_rows": int(len(X)),
+        "n_unique_patterns": n_unique,
+        "duplicate_row_fraction": float(1 - n_unique / len(X)),
+        "random_split_test_rows_seen_in_train": float(seen.mean()),
+        "conflicting_label_patterns": n_conflicting,
+        "conflicting_label_fraction": float(n_conflicting / n_unique) if n_unique else 0.0,
+    }
+
+
 def load_xy(path: Path | None = None) -> tuple[pd.DataFrame, pd.Series, np.ndarray]:
     """Convenience: recoded X, y, and pattern-group ids."""
     raw = load_raw(path)

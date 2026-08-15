@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -54,7 +55,8 @@ def confusion_counts(y_true, y_pred) -> dict[str, int]:
     return {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}
 
 
-def _cv_splitter(grouped: bool, n_splits: int = N_SPLITS, random_state: int = RANDOM_STATE):
+def cv_splitter(grouped: bool, n_splits: int = N_SPLITS, random_state: int = RANDOM_STATE):
+    """Grouped or plain stratified k-fold, seeded so folds are reproducible."""
     if grouped:
         return StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     return StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -69,7 +71,7 @@ def cross_validate_model(
     n_splits: int = N_SPLITS,
     random_state: int = RANDOM_STATE,
 ) -> dict[str, np.ndarray]:
-    cv = _cv_splitter(grouped, n_splits, random_state)
+    cv = cv_splitter(grouped, n_splits, random_state)
     if grouped and groups is None:
         raise ValueError("grouped=True requires pattern-group ids")
     return cross_validate(
@@ -193,6 +195,38 @@ def threshold_report(y_true, y_proba, threshold: float) -> dict[str, float]:
     metrics["fpr"] = float(fp / (fp + tn)) if (fp + tn) else 0.0
     metrics["fnr"] = float(fn / (fn + tp)) if (fn + tp) else 0.0
     return metrics
+
+
+def expected_cost(
+    y_true, y_proba, threshold: float, fp_cost: float = 1.0, fn_cost: float = 1.0
+) -> float:
+    """Mean misclassification cost per URL at ``threshold``.
+
+    Accuracy weights both error types equally, which is the wrong objective for a
+    security tool: blocking a legitimate bank and missing a credential-harvesting
+    page have very different consequences.
+    """
+    pred = (np.asarray(y_proba) >= threshold).astype(int)
+    counts = confusion_counts(y_true, pred)
+    total = len(np.asarray(y_true))
+    if not total:
+        return 0.0
+    return float((counts["fp"] * fp_cost + counts["fn"] * fn_cost) / total)
+
+
+def best_cost_threshold(
+    y_true,
+    y_proba,
+    fp_cost: float = 1.0,
+    fn_cost: float = 1.0,
+    grid: np.ndarray | None = None,
+) -> tuple[float, float]:
+    """Threshold minimising :func:`expected_cost`, and the cost it achieves."""
+    if grid is None:
+        grid = np.linspace(0.01, 0.99, 197)
+    costs = [expected_cost(y_true, y_proba, t, fp_cost, fn_cost) for t in grid]
+    i = int(np.argmin(costs))
+    return float(grid[i]), float(costs[i])
 
 
 def calibrate(

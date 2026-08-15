@@ -10,7 +10,6 @@ from phishing.data import (
     grouped_split,
     load_raw,
     load_xy,
-    pattern_group_ids,
     to_model_frame,
     unique_pattern_stats,
 )

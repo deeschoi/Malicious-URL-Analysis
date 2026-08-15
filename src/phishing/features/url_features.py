@@ -76,7 +76,6 @@ SHORTENERS = {
     "1url.com",
     "tweez.me",
     "v.gd",
-    "tr.im",
     "link.zip.net",
 }
 

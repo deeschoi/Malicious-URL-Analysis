@@ -18,3 +18,21 @@ where = ["src"]
 
 [project.scripts]
 phishing = "phishing.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [".venv", "notebooks", "*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    # The analysis scripts must call matplotlib.use("Agg") before importing
+    # pyplot, so their imports cannot all sit at the top of the file.
+    "E402",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Re-exports for convenience, not dead imports.
+"src/phishing/__init__.py" = ["F401"]
+"src/phishing/features/__init__.py" = ["F401"]

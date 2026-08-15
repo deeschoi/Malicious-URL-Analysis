@@ -13,11 +13,6 @@ access is worth.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -27,36 +22,39 @@ import pandas as pd
 from sklearn.base import clone
 
 from phishing.config import (
-    FEATURE_ORDER,
+    DEPLOYABLE_FEATURES,
+    FEATURE_COLUMNS,
     FIGURES_DIR,
-    RESULTS_DIR,
-    REVERSED_FEATURES as REVERSED,
+    REPORTS_DIR,
     SOURCE,
-    UNAVAILABLE_FEATURES,
     ensure_dirs,
 )
-from phishing.data import grouped_holdout, load_raw, split_xy
-from phishing.evaluate import save_json, score_all
+from phishing.config import (
+    NO_SIGNAL_FEATURES as NO_SIGNAL,
+)
+from phishing.config import (
+    REVERSED_FEATURES as REVERSED,
+)
+from phishing.data import grouped_split, load_xy
+from phishing.evaluate import metric_dict
+from phishing.io import save_json
 from phishing.models import build_models
-
-# Identified by the encoding audit in analysis/03.
-NO_SIGNAL = ["Favicon", "popUpWidnow", "Iframe"]
 
 
 def by_source(*kinds: str) -> list[str]:
-    return [f for f in FEATURE_ORDER if SOURCE[f] in kinds]
+    return [f for f in FEATURE_COLUMNS if SOURCE[f] in kinds]
 
 
 def scenarios() -> dict[str, list[str]]:
-    available = [f for f in FEATURE_ORDER if f not in UNAVAILABLE_FEATURES]
+    available = list(DEPLOYABLE_FEATURES)
     return {
-        "All 30 features": FEATURE_ORDER,
-        "Without SSLfinal_State": [f for f in FEATURE_ORDER if f != "SSLfinal_State"],
+        "All 30 features": FEATURE_COLUMNS,
+        "Without SSLfinal_State": [f for f in FEATURE_COLUMNS if f != "SSLfinal_State"],
         "Without the 5 dead-service features": available,
         "Without dead services or SSL": [f for f in available if f != "SSLfinal_State"],
-        "Without the 7 reversed features": [f for f in FEATURE_ORDER if f not in REVERSED],
+        "Without the 7 reversed features": [f for f in FEATURE_COLUMNS if f not in REVERSED],
         "Without reversed or no-signal features": [
-            f for f in FEATURE_ORDER if f not in REVERSED + NO_SIGNAL
+            f for f in FEATURE_COLUMNS if f not in REVERSED + NO_SIGNAL
         ],
         "URL string only (no network)": by_source("url_only"),
         "URL string + TLS certificate": by_source("url_only", "tls"),
@@ -69,11 +67,11 @@ def scenarios() -> dict[str, list[str]]:
 
 def main() -> None:
     ensure_dirs()
-    X, y = split_xy(load_raw())
-    X_tr, X_te, y_tr, y_te, _ = grouped_holdout(X, y)
+    X, y, groups = load_xy()
+    X_tr, X_te, y_tr, y_te, _, _ = grouped_split(X, y, groups)
 
     print("=== Feature availability in 2026 ===")
-    counts = pd.Series({f: SOURCE[f] for f in FEATURE_ORDER}).value_counts()
+    counts = pd.Series({f: SOURCE[f] for f in FEATURE_COLUMNS}).value_counts()
     for kind, n in counts.items():
         print(f"  {kind:10s} {n:2d} features")
 
@@ -85,7 +83,7 @@ def main() -> None:
     for label, feats in scenarios().items():
         model = clone(template).fit(X_tr[feats], y_tr)
         p = model.predict_proba(X_te[feats])[:, 1]
-        s = score_all(y_te, model.predict(X_te[feats]), p)
+        s = metric_dict(y_te, model.predict(X_te[feats]), p)
         if baseline is None:
             baseline = s["accuracy"]
         delta = s["accuracy"] - baseline
@@ -95,17 +93,17 @@ def main() -> None:
               f"auroc={s['auroc']:.4f}  ({delta:+.4f})")
 
     results = pd.DataFrame(rows)
-    results.to_csv(RESULTS_DIR / "04_obsolescence.csv", index=False)
+    results.to_csv(REPORTS_DIR / "04_obsolescence.csv", index=False)
 
     # How much does each individual feature actually matter on its own?
     print("\n=== Leave-one-out impact of the top features ===")
     loo = []
     for feat in ["SSLfinal_State", "URL_of_Anchor", "web_traffic", "Prefix_Suffix",
                  "having_Sub_Domain", "Links_in_tags"]:
-        feats = [f for f in FEATURE_ORDER if f != feat]
+        feats = [f for f in FEATURE_COLUMNS if f != feat]
         model = clone(template).fit(X_tr[feats], y_tr)
-        acc = score_all(y_te, model.predict(X_te[feats]),
-                        model.predict_proba(X_te[feats])[:, 1])["accuracy"]
+        acc = metric_dict(y_te, model.predict(X_te[feats]),
+                          model.predict_proba(X_te[feats])[:, 1])["accuracy"]
         loo.append({"feature": feat, "accuracy_without": acc,
                     "accuracy_lost": baseline - acc})
         print(f"  drop {feat:26s} -> {acc:.4f}  (loses {baseline - acc:+.4f})")
@@ -113,10 +111,10 @@ def main() -> None:
     save_json({"baseline_accuracy": baseline,
                "scenarios": results.to_dict("records"),
                "leave_one_out": loo},
-              RESULTS_DIR / "04_obsolescence.json")
+              REPORTS_DIR / "04_obsolescence.json")
 
     _plot(results, baseline)
-    print(f"\nWrote results to {RESULTS_DIR}")
+    print(f"\nWrote results to {REPORTS_DIR}")
 
 
 def _plot(results: pd.DataFrame, baseline: float) -> None:
@@ -128,7 +126,7 @@ def _plot(results: pd.DataFrame, baseline: float) -> None:
     ax.barh(pos, r["accuracy"], color=colors, edgecolor="black")
     ax.axvline(baseline, color="black", ls="--", lw=1.2,
                label=f"All 30 features ({baseline:.3f})")
-    for i, (acc, n) in enumerate(zip(r["accuracy"], r["n_features"])):
+    for i, (acc, n) in enumerate(zip(r["accuracy"], r["n_features"], strict=True)):
         ax.text(acc + 0.003, i, f"{acc:.3f}  (p={n})", va="center", fontsize=9)
 
     ax.set_yticks(pos)

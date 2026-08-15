@@ -33,7 +33,6 @@ def _tree_explainer(estimator, X_background: pd.DataFrame):
 
 
 def shap_values(estimator, X: pd.DataFrame, background: pd.DataFrame | None = None):
-    import shap
 
     bg = background if background is not None else X.sample(
         n=min(200, len(X)), random_state=42

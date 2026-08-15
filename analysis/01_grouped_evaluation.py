@@ -9,11 +9,6 @@ split where each distinct feature pattern belongs to exactly one side.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -23,25 +18,16 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_score
 
-from phishing.config import FIGURES_DIR, RESULTS_DIR, ensure_dirs
-from phishing.data import (
-    grouped_cv,
-    grouped_holdout,
-    leakage_report,
-    load_raw,
-    pattern_groups,
-    random_cv,
-    random_holdout,
-    split_xy,
-)
-from phishing.evaluate import save_json, score_all
+from phishing.config import FIGURES_DIR, REPORTS_DIR, ensure_dirs
+from phishing.data import grouped_split, leakage_report, load_xy, stratified_split
+from phishing.evaluate import cv_splitter, metric_dict
+from phishing.io import save_json
 from phishing.models import build_models
 
 
 def main() -> None:
     ensure_dirs()
-    df = load_raw()
-    X, y = split_xy(df)
+    X, y, groups = load_xy()
 
     leak = leakage_report(X, y)
     print("=== Leakage in the naive random split ===")
@@ -53,9 +39,8 @@ def main() -> None:
     print(f"patterns with contradictory labels    {leak['conflicting_label_patterns']} "
           f"({leak['conflicting_label_fraction']:.1%})")
 
-    groups = pattern_groups(X)
-    Xr_tr, Xr_te, yr_tr, yr_te = random_holdout(X, y)
-    Xg_tr, Xg_te, yg_tr, yg_te, g_tr = grouped_holdout(X, y)
+    Xr_tr, Xr_te, yr_tr, yr_te = stratified_split(X, y)
+    Xg_tr, Xg_te, yg_tr, yg_te, _, _ = grouped_split(X, y, groups)
     print(f"\ngrouped split sizes: train={len(Xg_tr):,} test={len(Xg_te):,} "
           f"(phishing rate {yg_te.mean():.3f})")
 
@@ -64,20 +49,21 @@ def main() -> None:
         print(f"\n--- {name} ---")
 
         cv_random = cross_val_score(
-            clone(model), Xr_tr, yr_tr, cv=random_cv(), scoring="accuracy", n_jobs=1
+            clone(model), Xr_tr, yr_tr, cv=cv_splitter(grouped=False),
+            scoring="accuracy", n_jobs=1,
         )
         cv_grouped = cross_val_score(
-            clone(model), X, y, groups=groups, cv=grouped_cv(),
+            clone(model), X, y, groups=groups, cv=cv_splitter(grouped=True),
             scoring="accuracy", n_jobs=1,
         )
 
         m_random = clone(model).fit(Xr_tr, yr_tr)
-        s_random = score_all(
+        s_random = metric_dict(
             yr_te, m_random.predict(Xr_te), m_random.predict_proba(Xr_te)[:, 1]
         )
 
         m_grouped = clone(model).fit(Xg_tr, yg_tr)
-        s_grouped = score_all(
+        s_grouped = metric_dict(
             yg_te, m_grouped.predict(Xg_te), m_grouped.predict_proba(Xg_te)[:, 1]
         )
 
@@ -98,10 +84,10 @@ def main() -> None:
         })
 
     results = pd.DataFrame(rows).set_index("model")
-    results.to_csv(RESULTS_DIR / "01_grouped_evaluation.csv")
+    results.to_csv(REPORTS_DIR / "01_grouped_evaluation.csv")
     save_json(
         {"leakage": leak, "results": results.reset_index().to_dict("records")},
-        RESULTS_DIR / "01_grouped_evaluation.json",
+        REPORTS_DIR / "01_grouped_evaluation.json",
     )
 
     print("\n=== Honest (grouped) test performance ===")
@@ -112,7 +98,7 @@ def main() -> None:
           .round(4).to_string())
 
     _plot(results)
-    print(f"\nWrote results to {RESULTS_DIR}")
+    print(f"\nWrote results to {REPORTS_DIR}")
 
 
 def _plot(results: pd.DataFrame) -> None:
@@ -127,7 +113,9 @@ def _plot(results: pd.DataFrame) -> None:
     ax.barh(pos - height / 2, r["grouped_accuracy"], height,
             label="Grouped split (honest)", color="#2b7a78", edgecolor="black")
 
-    for i, (rand, grp) in enumerate(zip(r["random_accuracy"], r["grouped_accuracy"])):
+    for i, (rand, grp) in enumerate(
+        zip(r["random_accuracy"], r["grouped_accuracy"], strict=True)
+    ):
         ax.text(rand + 0.002, i + height / 2, f"{rand:.3f}", va="center", fontsize=9)
         ax.text(grp + 0.002, i - height / 2, f"{grp:.3f}", va="center", fontsize=9)
 

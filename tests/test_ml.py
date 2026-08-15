@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 from phishing.config import LEGITIMATE
 from phishing.data import load_xy
 from phishing.decay import apply_decay, cheapest_features, flip_toward_legitimate
-from phishing.evaluate import best_f1_threshold, fpr_target_threshold, metric_dict
+from phishing.evaluate import best_f1_threshold, fpr_target_threshold
 from phishing.mining import surrogate_tree, to_item_matrix
 from phishing.models import build_model
 

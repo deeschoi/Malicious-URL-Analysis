@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from phishing.config import FEATURE_COLUMNS, LEGITIMATE, PHISHING, SUSPICIOUS
+from phishing.config import LEGITIMATE, PHISHING, SUSPICIOUS
 from phishing.features.content_features import (
     extract_content_features,
     redirect_feature,
@@ -44,7 +44,8 @@ def test_shortener_and_at_and_dash():
 
 
 def test_double_slash_position():
-    assert double_slash_redirecting("http://www.legitimate.com//http://www.phishing.com") == PHISHING
+    late = "http://www.legitimate.com//http://www.phishing.com"
+    assert double_slash_redirecting(late) == PHISHING
     assert double_slash_redirecting("https://www.paypal.com/login") == LEGITIMATE
 
 

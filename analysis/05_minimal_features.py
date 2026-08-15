@@ -8,31 +8,25 @@ still obtainable in 2026 makes the answer directly usable by the scanner.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier, export_text
 
 from phishing.config import (
-    FEATURE_ORDER,
+    DEPLOYABLE_FEATURES,
     FIGURES_DIR,
     RANDOM_STATE,
-    RESULTS_DIR,
-    UNAVAILABLE_FEATURES,
+    REPORTS_DIR,
     ensure_dirs,
 )
-from phishing.data import grouped_cv, grouped_holdout, load_raw, pattern_groups, split_xy
-from phishing.evaluate import save_json, score_all
+from phishing.data import grouped_split, load_xy
+from phishing.evaluate import cv_splitter, metric_dict
+from phishing.io import save_json
 from phishing.models import build_models
 
 MAX_FEATURES = 12
@@ -40,7 +34,7 @@ MAX_FEATURES = 12
 
 def forward_select(X, y, groups, candidates, model, max_features=MAX_FEATURES):
     chosen, history, remaining = [], [], list(candidates)
-    cv = grouped_cv()
+    cv = cv_splitter(grouped=True)
 
     while remaining and len(chosen) < max_features:
         scored = []
@@ -62,23 +56,21 @@ def forward_select(X, y, groups, candidates, model, max_features=MAX_FEATURES):
 
 def main() -> None:
     ensure_dirs()
-    X, y = split_xy(load_raw())
-    groups = pattern_groups(X)
-    X_tr, X_te, y_tr, y_te, _ = grouped_holdout(X, y)
+    X, y, groups = load_xy()
+    X_tr, X_te, y_tr, y_te, _, _ = grouped_split(X, y, groups)
 
     # A shallow tree is fast enough to make forward selection tractable and is
     # itself a candidate deliverable, since the result is human-readable.
     selector_model = DecisionTreeClassifier(max_depth=8, random_state=RANDOM_STATE)
-    deployable = [f for f in FEATURE_ORDER if f not in UNAVAILABLE_FEATURES]
+    deployable = list(DEPLOYABLE_FEATURES)
 
     print("=== Greedy forward selection over features available in 2026 ===")
     chosen, history = forward_select(X, y, groups, deployable, selector_model)
 
-    hist = pd.DataFrame(history)
     xgb_template = build_models()["XGBoost"]
 
     full = clone(xgb_template).fit(X_tr[deployable], y_tr)
-    full_acc = score_all(
+    full_acc = metric_dict(
         y_te, full.predict(X_te[deployable]),
         full.predict_proba(X_te[deployable])[:, 1],
     )["accuracy"]
@@ -90,7 +82,7 @@ def main() -> None:
     for k in range(1, len(chosen) + 1):
         feats = chosen[:k]
         m = clone(xgb_template).fit(X_tr[feats], y_tr)
-        s = score_all(y_te, m.predict(X_te[feats]), m.predict_proba(X_te[feats])[:, 1])
+        s = metric_dict(y_te, m.predict(X_te[feats]), m.predict_proba(X_te[feats])[:, 1])
         curve.append({"k": k, "features": feats, **s})
         print(f"  k={k:2d}  acc={s['accuracy']:.4f}  auroc={s['auroc']:.4f}  "
               f"(+{feats[-1]})")
@@ -105,7 +97,7 @@ def main() -> None:
     print("\n=== Same features as a readable decision tree (depth 4) ===")
     tree = DecisionTreeClassifier(max_depth=4, random_state=RANDOM_STATE)
     tree.fit(X_tr[chosen[:k_star]], y_tr)
-    tree_acc = score_all(
+    tree_acc = metric_dict(
         y_te, tree.predict(X_te[chosen[:k_star]]),
         tree.predict_proba(X_te[chosen[:k_star]])[:, 1],
     )
@@ -113,9 +105,9 @@ def main() -> None:
     rules = export_text(tree, feature_names=chosen[:k_star], max_depth=4)
     print(rules[:1500])
 
-    (RESULTS_DIR / "05_decision_rules.txt").write_text(rules)
+    (REPORTS_DIR / "05_decision_rules.txt").write_text(rules)
     curve_df.drop(columns=["features"]).to_csv(
-        RESULTS_DIR / "05_minimal_features.csv", index=False
+        REPORTS_DIR / "05_minimal_features.csv", index=False
     )
     save_json({
         "selection_history": history,
@@ -126,10 +118,10 @@ def main() -> None:
         "minimal_feature_set": chosen[:k_star],
         "full_deployable_accuracy": full_acc,
         "shallow_tree_accuracy": tree_acc["accuracy"],
-    }, RESULTS_DIR / "05_minimal_features.json")
+    }, REPORTS_DIR / "05_minimal_features.json")
 
     _plot(curve_df, full_acc, k_star, chosen)
-    print(f"\nWrote results to {RESULTS_DIR}")
+    print(f"\nWrote results to {REPORTS_DIR}")
 
 
 def _plot(curve_df, full_acc, k_star, chosen) -> None:

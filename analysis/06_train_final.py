@@ -1,81 +1,83 @@
-"""Train and persist the models the scanner serves.
+"""Train and persist the model the scanner serves.
 
-Two models are produced:
+One model is produced, over the 25 features still obtainable in 2026. It is
+fitted on the grouped training partition and evaluated on the held-out grouped
+partition, then refitted on the full dataset for serving. Both operating points
+are chosen on the held-out partition so they are not tuned on data the served
+model has memorised.
 
-  primary  - the 8 features chosen by forward selection. Needs a URL parse, a TLS
-             handshake, and one page fetch.
-  fallback - URL string plus TLS certificate only, used when the page cannot be
-             fetched at all.
-
-Both are fitted on the grouped training partition, evaluated on the held-out
-grouped test partition, then refitted on the full dataset for serving. Operating
-thresholds are chosen on the held-out partition so they are not tuned on data the
-final model has memorised.
+Features the live extractor cannot measure for a given URL are filled with the
+extractor's documented fallback and flagged in the scan response, so a single
+model degrades gracefully rather than needing a separate fallback estimator.
 """
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import joblib
 from sklearn.base import clone
 
-from phishing.config import (
-    FALLBACK_FEATURES,
-    MODELS_DIR,
-    PRIMARY_FEATURES,
-    RESULTS_DIR,
-    ensure_dirs,
-)
-from phishing.data import grouped_holdout, load_raw, split_xy
-from phishing.evaluate import best_threshold, save_json, score_all, threshold_metrics
+from phishing.config import ARTIFACTS_DIR, DEPLOYABLE_FEATURES, REPORTS_DIR, ensure_dirs
+from phishing.data import grouped_split, load_xy
+from phishing.evaluate import best_cost_threshold, metric_dict, threshold_report
+from phishing.io import save_json
 from phishing.models import build_models
+from phishing.tuning import persist_model
 
-# Operating points the scanner exposes. "warn" is tuned for balanced cost;
-# "block" is tuned to make false alarms ten times as expensive as misses.
+MODEL_NAME = "XGBoost"
+
+# Operating points the scanner exposes, as (false positive cost, false negative
+# cost). "warn" weights both errors alike; "block" makes a false alarm ten times
+# as expensive, because silently blocking a legitimate site is worse than
+# showing a warning the user can dismiss.
 OPERATING_POINTS = {"warn": (1.0, 1.0), "block": (10.0, 1.0)}
 
 
-def train_one(label: str, features: list[str], X, y, X_tr, X_te, y_tr, y_te) -> dict:
-    print(f"\n=== {label} model ({len(features)} features) ===")
+def main() -> None:
+    ensure_dirs()
+    X, y, groups = load_xy()
+    X_tr, X_te, y_tr, y_te, _, _ = grouped_split(X, y, groups)
+
+    features = list(DEPLOYABLE_FEATURES)
+    print(f"=== Deployable model ({len(features)} features) ===")
     print(f"  {', '.join(features)}")
 
-    template = build_models()["XGBoost"]
-
+    template = build_models()[MODEL_NAME]
     evaluated = clone(template).fit(X_tr[features], y_tr)
     proba = evaluated.predict_proba(X_te[features])[:, 1]
-    metrics = score_all(y_te, evaluated.predict(X_te[features]), proba)
+    metrics = metric_dict(y_te, evaluated.predict(X_te[features]), proba)
     print(f"  held-out accuracy {metrics['accuracy']:.4f}  "
           f"auroc {metrics['auroc']:.4f}  brier {metrics['brier']:.4f}")
 
     thresholds = {}
     for name, (fp_cost, fn_cost) in OPERATING_POINTS.items():
-        t, _ = best_threshold(y_te, proba, fp_cost, fn_cost)
-        m = threshold_metrics(y_te, proba, t)
-        thresholds[name] = m
-        print(f"  {name:5s} threshold {t:.3f} -> recall {m['recall']:.3f}, "
-              f"false-positive rate {m['false_positive_rate']:.3f}")
+        t, _ = best_cost_threshold(y_te, proba, fp_cost, fn_cost)
+        report = threshold_report(y_te, proba, t)
+        thresholds[name] = report
+        print(f"  {name:5s} threshold {t:.3f} -> recall {report['recall']:.3f}, "
+              f"false-positive rate {report['fpr']:.3f}")
+
+    warn = thresholds["warn"]["threshold"]
+    block = max(thresholds["block"]["threshold"], warn)
+
+    # The scanner reports quality at the warn threshold, so store that view.
+    served_metrics = dict(metrics)
+    served_metrics["recall"] = thresholds["warn"]["recall"]
+    served_metrics["fpr"] = thresholds["warn"]["fpr"]
 
     # Refit on everything for serving; the numbers above stay the honest estimate.
     served = clone(template).fit(X[features], y)
-    joblib.dump(
-        {"model": served, "features": features, "thresholds": thresholds,
-         "metrics": metrics},
-        MODELS_DIR / f"{label}.joblib",
+    path = persist_model(
+        served,
+        feature_names=features,
+        threshold=warn,
+        metrics=served_metrics,
+        model_name=MODEL_NAME,
+        notes="Grouped holdout evaluation; refitted on the full dataset for serving.",
+        extra={"fpr_threshold": block, "operating_points": thresholds},
+        path=ARTIFACTS_DIR / "model.joblib",
     )
-    print(f"  saved to {MODELS_DIR / f'{label}.joblib'}")
-
-    return {"features": features, "metrics": metrics, "thresholds": thresholds}
-
-
-def main() -> None:
-    ensure_dirs()
-    X, y = split_xy(load_raw())
-    X_tr, X_te, y_tr, y_te, _ = grouped_holdout(X, y)
+    print(f"\n  saved to {path}")
 
     card = {
         "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -84,20 +86,14 @@ def main() -> None:
         "evaluation": "grouped holdout; no feature pattern shared between train and test",
         "n_train": int(len(X_tr)),
         "n_test": int(len(X_te)),
-        "algorithm": "XGBoost (400 trees, depth 6, lr 0.05)",
-        "models": {},
+        "algorithm": "XGBoost (300 trees, depth 5, lr 0.08)",
+        "features": features,
+        "metrics": metrics,
+        "thresholds": thresholds,
+        "artifact": str(path),
     }
-
-    card["models"]["primary"] = train_one(
-        "primary", PRIMARY_FEATURES, X, y, X_tr, X_te, y_tr, y_te
-    )
-    card["models"]["fallback"] = train_one(
-        "fallback", FALLBACK_FEATURES, X, y, X_tr, X_te, y_tr, y_te
-    )
-
-    save_json(card, RESULTS_DIR / "06_model_card.json")
-    joblib.dump(card, MODELS_DIR / "model_card.joblib")
-    print(f"\nModel card written to {RESULTS_DIR / '06_model_card.json'}")
+    save_json(card, REPORTS_DIR / "06_model_card.json")
+    print(f"Model card written to {REPORTS_DIR / '06_model_card.json'}")
 
 
 if __name__ == "__main__":

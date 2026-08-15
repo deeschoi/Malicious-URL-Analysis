@@ -8,13 +8,11 @@ import pandas as pd
 
 from phishing.config import (
     FEATURE_COLUMNS,
-    LEGITIMATE,
     TIER_A,
     TIER_B,
     TIER_C,
-    UNAVAILABLE_2026,
 )
-from phishing.features.content_features import extract_content_features
+from phishing.features.content_features import extract_content_features, redirect_feature
 from phishing.features.fetch import FetchResult, fetch_page
 from phishing.features.infra_features import extract_infra_features, unavailable_features
 from phishing.features.url_features import extract_url_features
@@ -37,6 +35,7 @@ def url_to_features(
     url: str,
     tier: Tier = "full",
     fetch: FetchResult | None = None,
+    timeout: int | None = None,
 ) -> tuple[pd.Series, list[FeatureWarning]]:
     """Extract features in CSV column order.
 
@@ -54,7 +53,12 @@ def url_to_features(
         values.update(_neutral_fill(TIER_A, f"URL parse failed: {exc}", warnings))
 
     if tier in ("B", "full"):
-        result = fetch if fetch is not None else fetch_page(url)
+        if fetch is not None:
+            result = fetch
+        elif timeout is not None:
+            result = fetch_page(url, timeout=timeout)
+        else:
+            result = fetch_page(url)
         page_url = result.final_url or url
         if result.ok and result.soup is not None:
             try:
@@ -71,11 +75,7 @@ def url_to_features(
                     warnings,
                 )
             )
-        if fetch is None:
-            # Redirect is a content-tier feature but comes from the fetch itself.
-            from phishing.features.content_features import redirect_feature
-
-            values["Redirect"] = redirect_feature(result.n_redirects)
+        values["Redirect"] = redirect_feature(result.n_redirects)
 
     if tier == "full":
         try:

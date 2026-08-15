@@ -78,7 +78,7 @@ def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> int:
         return PHISHING
     issuer_parts = []
     for rdn in cert.get("issuer", ()):
-        for key, value in rdn:
+        for _key, value in rdn:
             issuer_parts.append(str(value))
     issuer = " ".join(issuer_parts).lower()
     trusted = any(token in issuer for token in TRUSTED_ISSUERS)

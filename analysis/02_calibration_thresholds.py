@@ -10,11 +10,6 @@ first place, then derives operating points for two deployment modes: a tolerant
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -25,15 +20,15 @@ from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import brier_score_loss
 
-from phishing.config import FIGURES_DIR, RESULTS_DIR, ensure_dirs
-from phishing.data import grouped_holdout, load_raw, split_xy
+from phishing.config import FIGURES_DIR, REPORTS_DIR, ensure_dirs
+from phishing.data import grouped_split, load_xy
 from phishing.evaluate import (
-    best_threshold,
+    best_cost_threshold,
     expected_cost,
     reliability_curve,
-    save_json,
-    threshold_metrics,
+    threshold_report,
 )
+from phishing.io import save_json
 from phishing.models import build_models
 
 # Cost ratios expressed as (false positive cost, false negative cost).
@@ -49,8 +44,8 @@ COST_SCENARIOS = {
 
 def main() -> None:
     ensure_dirs()
-    X, y = split_xy(load_raw())
-    X_tr, X_te, y_tr, y_te, _ = grouped_holdout(X, y)
+    X, y, groups = load_xy()
+    X_tr, X_te, y_tr, y_te, _, _ = grouped_split(X, y, groups)
 
     models = build_models()
     proba, calibrated_proba = {}, {}
@@ -78,8 +73,8 @@ def main() -> None:
     for name in models:
         p = proba[name]
         for label, (fp_cost, fn_cost) in COST_SCENARIOS.items():
-            t, cost = best_threshold(y_te, p, fp_cost, fn_cost)
-            m = threshold_metrics(y_te, p, t)
+            t, cost = best_cost_threshold(y_te, p, fp_cost, fn_cost)
+            m = threshold_report(y_te, p, t)
             default = expected_cost(y_te, p, 0.5, fp_cost, fn_cost)
             thr_rows.append({
                 "model": name, "scenario": label, **m,
@@ -90,15 +85,15 @@ def main() -> None:
     thr = pd.DataFrame(thr_rows)
     best = thr.loc[thr["model"] == "XGBoost"]
     print(best[["scenario", "threshold", "accuracy", "precision", "recall",
-                "false_positive_rate", "cost_reduction"]].round(4).to_string(index=False))
+                "fpr", "cost_reduction"]].round(4).to_string(index=False))
 
     print("\n=== Recall achievable at strict false-positive budgets (XGBoost) ===")
     budget_rows = []
     p = proba["XGBoost"]
     for budget in (0.001, 0.005, 0.01, 0.02, 0.05):
         grid = np.linspace(0.001, 0.999, 999)
-        feasible = [(t, threshold_metrics(y_te, p, t)) for t in grid]
-        feasible = [(t, m) for t, m in feasible if m["false_positive_rate"] <= budget]
+        feasible = [(t, threshold_report(y_te, p, t)) for t in grid]
+        feasible = [(t, m) for t, m in feasible if m["fpr"] <= budget]
         if not feasible:
             continue
         t, m = max(feasible, key=lambda tm: tm[1]["recall"])
@@ -107,16 +102,16 @@ def main() -> None:
               f"{m['recall']:.1%} of phishing sites "
               f"(misses {m['fn']} of {m['fn'] + m['tp']})")
 
-    thr.to_csv(RESULTS_DIR / "02_thresholds.csv", index=False)
+    thr.to_csv(REPORTS_DIR / "02_thresholds.csv", index=False)
     save_json(
         {"calibration": calib_rows, "thresholds": thr.to_dict("records"),
          "fpr_budgets": budget_rows},
-        RESULTS_DIR / "02_calibration_thresholds.json",
+        REPORTS_DIR / "02_calibration_thresholds.json",
     )
 
     _plot_reliability(y_te, proba, calibrated_proba)
     _plot_cost_curves(y_te, proba)
-    print(f"\nWrote results to {RESULTS_DIR}")
+    print(f"\nWrote results to {REPORTS_DIR}")
 
 
 def _plot_reliability(y_te, proba, calibrated_proba) -> None:
@@ -143,7 +138,7 @@ def _plot_reliability(y_te, proba, calibrated_proba) -> None:
 def _plot_cost_curves(y_te, proba) -> None:
     grid = np.linspace(0.01, 0.99, 197)
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.6), sharey=False)
-    for ax, (label, (fp_cost, fn_cost)) in zip(axes, COST_SCENARIOS.items()):
+    for ax, (label, (fp_cost, fn_cost)) in zip(axes, COST_SCENARIOS.items(), strict=True):
         for name, p in proba.items():
             costs = [expected_cost(y_te, p, t, fp_cost, fn_cost) for t in grid]
             ax.plot(grid, costs, lw=1.6, label=name)

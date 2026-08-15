@@ -9,11 +9,6 @@ verdicts.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -23,16 +18,16 @@ import pandas as pd
 import shap
 from sklearn.inspection import permutation_importance
 
-from phishing.config import FEATURE_INFO, FIGURES_DIR, RANDOM_STATE, RESULTS_DIR, ensure_dirs
-from phishing.data import grouped_holdout, load_raw, split_xy
-from phishing.evaluate import save_json
+from phishing.config import FEATURE_INFO, FIGURES_DIR, RANDOM_STATE, REPORTS_DIR, ensure_dirs
+from phishing.data import grouped_split, load_xy
+from phishing.io import save_json
 from phishing.models import build_models
 
 
 def main() -> None:
     ensure_dirs()
-    X, y = split_xy(load_raw())
-    X_tr, X_te, y_tr, y_te, _ = grouped_holdout(X, y)
+    X, y, groups = load_xy()
+    X_tr, X_te, y_tr, y_te, _, _ = grouped_split(X, y, groups)
 
     model = build_models()["XGBoost"].fit(X_tr, y_tr)
 
@@ -109,8 +104,8 @@ def main() -> None:
     for a, b, v in interactions[:8]:
         print(f"  {a} x {b}: {v:.4f}")
 
-    imp.to_csv(RESULTS_DIR / "03_feature_importance.csv", index=False)
-    direction.to_csv(RESULTS_DIR / "03_shap_direction.csv", index=False)
+    imp.to_csv(REPORTS_DIR / "03_feature_importance.csv", index=False)
+    direction.to_csv(REPORTS_DIR / "03_shap_direction.csv", index=False)
     save_json(
         {
             "top_two_share": float(concentration),
@@ -120,11 +115,11 @@ def main() -> None:
             "no_signal_features": null_feats,
             "encoding_audit": rates.to_dict("records"),
         },
-        RESULTS_DIR / "03_shap.json",
+        REPORTS_DIR / "03_shap.json",
     )
 
     _plot(sv, X_te, imp)
-    print(f"\nWrote results to {RESULTS_DIR}")
+    print(f"\nWrote results to {REPORTS_DIR}")
 
 
 def _conditional_rates(X: pd.DataFrame, y: pd.Series, tol: float = 0.01) -> pd.DataFrame:

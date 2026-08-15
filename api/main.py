@@ -2,28 +2,33 @@
 
 from __future__ import annotations
 
-import json
-import sys
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from phishing.config import RESULTS_DIR, ROOT, UNAVAILABLE_FEATURES, DEAD_FEATURE_REASON
-from phishing.extract import UnsafeTargetError
-from phishing.scanner import available_models, scan
+from phishing.db import init_db, record_scan, recent_scans, scan_stats
+from phishing.scanner import UnsafeTargetError, available_models, research_findings, scan
 
-WEB_DIR = ROOT / "web"
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    yield
+
 
 app = FastAPI(
     title="Phishing URL Scanner",
     description="Explained phishing verdicts from a model trained on the UCI "
                 "Phishing Websites dataset.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -35,7 +40,12 @@ class ScanRequest(BaseModel):
 @app.post("/api/scan")
 def scan_url(request: ScanRequest) -> dict:
     try:
-        return scan(request.url, timeout=request.timeout)
+        started = time.perf_counter()
+        result = scan(request.url, timeout=request.timeout)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        result["scan_id"] = record_scan(result, duration_ms=duration_ms)
+        result["duration_ms"] = duration_ms
+        return result
     except UnsafeTargetError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
@@ -69,28 +79,22 @@ def model_info() -> dict:
 @app.get("/api/findings")
 def findings() -> dict:
     """Headline results from the analysis, surfaced alongside the scanner."""
-    def read(name: str) -> dict:
-        path = RESULTS_DIR / name
-        return json.loads(path.read_text()) if path.exists() else {}
+    return research_findings()
 
-    leakage = read("01_grouped_evaluation.json")
-    shap_res = read("03_shap.json")
-    obsolescence = read("04_obsolescence.json")
-    minimal = read("05_minimal_features.json")
 
-    return {
-        "leakage": leakage.get("leakage", {}),
-        "models": leakage.get("results", []),
-        "reversed_features": shap_res.get("reversed_features", []),
-        "no_signal_features": shap_res.get("no_signal_features", []),
-        "encoding_audit": shap_res.get("encoding_audit", []),
-        "top_interactions": shap_res.get("interactions", [])[:6],
-        "scenarios": obsolescence.get("scenarios", []),
-        "minimal_feature_set": minimal.get("minimal_feature_set", []),
-        "unavailable_features": [
-            {"feature": f, "reason": DEAD_FEATURE_REASON[f]} for f in UNAVAILABLE_FEATURES
-        ],
-    }
+@app.get("/api/scans")
+def scans(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    """Recent scan history. URLs are stored without their query strings."""
+    return {"scans": recent_scans(limit=limit, offset=offset)}
+
+
+@app.get("/api/stats")
+def stats(days: int = Query(30, ge=1, le=365)) -> dict:
+    """Verdict mix and mean score per day, for spotting score drift."""
+    return scan_stats(days=days)
 
 
 @app.get("/api/health")

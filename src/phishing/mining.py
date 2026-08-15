@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier, export_text
 
-from phishing.config import FEATURE_COLUMNS, RANDOM_STATE
+from phishing.config import RANDOM_STATE
 
 
 def to_item_matrix(X: pd.DataFrame) -> pd.DataFrame:

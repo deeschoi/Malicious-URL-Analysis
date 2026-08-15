@@ -19,10 +19,9 @@ import pandas as pd
 from phishing.config import (
     ARTIFACTS_DIR,
     DEPLOYABLE_FEATURES,
-    FEATURE_COLUMNS,
-    FIGURES_DIR,
     REPORTS_DIR,
     RISK_BANDS,
+    ensure_dirs,
 )
 from phishing.data import grouped_split, load_xy
 from phishing.decay import adversarial_curve, decay_simulation, tier_ablation
@@ -37,12 +36,6 @@ from phishing.models import ALL_MODELS, NOTEBOOK_MODELS, build_model
 from phishing.tuning import persist_model
 
 
-def _ensure_dirs() -> None:
-    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-
-
 def _risk_band(probability: float) -> str:
     for lo, hi, name in RISK_BANDS:
         if lo <= probability < hi:
@@ -51,7 +44,7 @@ def _risk_band(probability: float) -> str:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
-    _ensure_dirs()
+    ensure_dirs()
     X, y, groups = load_xy()
     names = NOTEBOOK_MODELS if args.quick else ALL_MODELS
     print(f"Computing leakage-delta table for: {', '.join(names)}")
@@ -65,7 +58,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
 
 def cmd_train(args: argparse.Namespace) -> int:
     """Train the 25-feature deployable model and persist it."""
-    _ensure_dirs()
+    ensure_dirs()
     X, y, groups = load_xy()
     X = X[DEPLOYABLE_FEATURES]
     X_tr, X_te, y_tr, y_te, g_tr, g_te = grouped_split(X, y, groups)
@@ -82,7 +75,8 @@ def cmd_train(args: argparse.Namespace) -> int:
         metrics["model"] = name
         rows.append(metrics)
         fitted[name] = (est, proba)
-        print(f"{name:22s}  acc={metrics['accuracy']:.4f}  auroc={metrics['auroc']:.4f}  f1={metrics['f1']:.4f}")
+        print(f"{name:22s}  acc={metrics['accuracy']:.4f}  "
+              f"auroc={metrics['auroc']:.4f}  f1={metrics['f1']:.4f}")
 
     comparison = pd.DataFrame(rows).set_index("model")
     comparison.to_csv(REPORTS_DIR / "deployable_holdout.csv")
@@ -210,9 +204,9 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     """Compare live Tier-A features on known URLs against the 2012 legitimate class."""
+    from phishing.config import TARGET_COLUMN, TIER_A
     from phishing.data import load_raw, to_model_frame
     from phishing.features.url_features import extract_url_features
-    from phishing.config import TIER_A, TARGET_COLUMN
 
     legit_urls = [
         "https://www.google.com/",
@@ -272,7 +266,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             ].mean(),
         }
     )
-    _ensure_dirs()
+    ensure_dirs()
     comparison.to_csv(REPORTS_DIR / "extractor_drift.csv")
     live.to_csv(REPORTS_DIR / "extractor_live_sample.csv", index=False)
     print(comparison.round(3).to_string())
