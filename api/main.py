@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from phishing.db import init_db, record_scan, recent_scans, scan_stats
+from phishing.db import init_db, recent_scans, record_scan, scan_stats
 from phishing.scanner import UnsafeTargetError, available_models, research_findings, scan
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"

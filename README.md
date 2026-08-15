@@ -174,10 +174,37 @@ python analysis/06_train_final.py            # persist artifacts/model.joblib
 The scanner UI is not hosted anywhere. After the venv is active and `artifacts/model.joblib` exists (`phishing train --tune` if you have not trained yet):
 
 ```bash
-PYTHONPATH=src uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8000
 ```
 
-If you ran `pip install -e .`, you can drop `PYTHONPATH=src`. Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. You should see **Phishing URL Scanner** with a URL field and a **Research findings** tab. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. You should see **Phishing URL Scanner** with a URL field and a **Research findings** tab. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
+
+Or in a container. The image trains the model during the build, so it is reproducible from source alone and needs no pre-built artifact:
+
+```bash
+docker compose up --build                     # SQLite, data in a named volume
+docker compose --profile postgres up --build  # with Postgres alongside
+```
+
+### Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PHISHING_ROOT` | repo root | Base for data, artifacts, and reports |
+| `PHISHING_DATA` | `$PHISHING_ROOT/Training_Dataset.csv` | Training CSV |
+| `PHISHING_ARTIFACTS_DIR` | `$PHISHING_ROOT/artifacts` | Where the served model lives |
+| `PHISHING_REPORTS_DIR` | `$PHISHING_ROOT/reports` | Analysis tables and figures |
+| `PHISHING_DATABASE_URL` | `sqlite:///$PHISHING_ROOT/data/scans.db` | Scan telemetry store |
+
+### Scan telemetry
+
+Every scan is logged so the API can report what it has seen and whether its score distribution is drifting: `GET /api/scans` for recent history, `GET /api/stats` for the verdict mix and mean probability per day. Query strings are stripped before storage because they routinely carry session tokens; a SHA-256 of the full URL is kept so repeat scans can still be counted. A logging failure never fails a scan.
+
+Research outputs stay as files in `reports/`. They are artifacts of a pipeline run, not telemetry, and gain nothing from a schema.
+
+```bash
+alembic upgrade head    # apply migrations (the API also creates tables on boot)
+```
 
 Narrative notebooks that import the same package: [`notebooks/01_honest_baseline.ipynb`](notebooks/01_honest_baseline.ipynb), [`notebooks/02_feature_decay.ipynb`](notebooks/02_feature_decay.ipynb), [`notebooks/03_rule_mining.ipynb`](notebooks/03_rule_mining.ipynb).
 
@@ -197,15 +224,19 @@ src/phishing/
   mining.py                   FP-Growth, k-modes, surrogate tree
   cli.py                      evaluate | train | scan | validate
   io.py                       JSON writers shared by the analysis scripts
+  db.py                       scan telemetry (SQLAlchemy, SQLite or Postgres)
   scanner.py                  live scan → verdict, SHAP signals, coverage
   features/                   live extractor (fetch, URL, HTML, TLS/WHOIS)
 analysis/                     numbered research scripts → reports/
-api/main.py                   FastAPI service (scan, model, findings, health)
+api/main.py                   FastAPI service (scan, scans, stats, findings)
 web/                          vanilla JS scanner UI served by the API
+migrations/                   alembic revisions for the scans table
+scripts/check_imports.py      CI guard: every entry point still imports
 tests/                        pytest, network tests marked skippable
 notebooks/                    stages 1–3 narrative
 reports/                      CSV / JSON / figures from the analysis scripts
 artifacts/model.joblib        fitted 25-feature model (gitignored; run train)
+Dockerfile                    trains the model at build, serves via uvicorn
 ```
 
 ## Limitations

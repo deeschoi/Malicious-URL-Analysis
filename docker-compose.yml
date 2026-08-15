@@ -6,11 +6,31 @@ services:
       - "8000:8000"
     environment:
       PHISHING_ROOT: /app
-      # Set by the database phase; SQLite file by default.
       PHISHING_DATABASE_URL: ${PHISHING_DATABASE_URL:-sqlite:////app/data/scans.db}
     volumes:
       - scan-data:/app/data
     restart: unless-stopped
 
+  # Opt in with: docker compose --profile postgres up
+  # then point the API at it:
+  #   PHISHING_DATABASE_URL=postgresql+psycopg2://phishing:phishing@db:5432/phishing
+  db:
+    profiles: [postgres]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: phishing
+      POSTGRES_PASSWORD: phishing
+      POSTGRES_DB: phishing
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phishing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   scan-data:
+  pg-data:

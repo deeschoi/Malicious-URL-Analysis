@@ -9,6 +9,8 @@ __pycache__/
 .mypy_cache/
 artifacts/
 *.joblib
+data/
+*.db
 reports/figures/
 .coverage
 htmlcov/
