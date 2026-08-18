@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    case,
     create_engine,
     func,
     select,
@@ -32,6 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from phishing.config import PROJECT_ROOT
+from phishing.features.reachability import LIVE_RISK_VERDICTS
 
 DEFAULT_DATABASE_URL = f"sqlite:///{PROJECT_ROOT / 'data' / 'scans.db'}"
 
@@ -185,8 +187,11 @@ def scan_stats(days: int = 30) -> dict[str, Any]:
         ).all()
 
         day = func.date(Scan.created_at)
+        live_probability = case(
+            (Scan.verdict.in_(LIVE_RISK_VERDICTS), Scan.probability),
+        )
         daily = session.execute(
-            select(day, func.count(Scan.id), func.avg(Scan.probability))
+            select(day, func.count(Scan.id), func.avg(live_probability))
             .group_by(day)
             .order_by(day.desc())
             .limit(days)

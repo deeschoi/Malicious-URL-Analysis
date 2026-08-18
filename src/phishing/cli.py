@@ -171,11 +171,12 @@ def cmd_scan(args: argparse.Namespace) -> int:
         return 1
 
     estimator, artifact = load_model(model_path)
-    features, warnings = url_to_features(args.url, tier=args.tier)
+    features, warnings, probe = url_to_features(args.url, tier=args.tier)
     X = features[artifact.feature_names].to_frame().T
     proba = float(estimator.predict_proba(X)[:, 1][0])
     band = _risk_band(proba)
-    pred = int(proba >= artifact.threshold)
+    withheld = probe.status in {"unreachable", "fetch_failed"}
+    pred = None if withheld else int(proba >= artifact.threshold)
 
     reasons = []
     try:
@@ -190,7 +191,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
         "url": args.url,
         "probability": round(proba, 4),
         "band": band,
-        "prediction": "phishing" if pred else "legitimate",
+        "reachability": probe.to_dict(),
+        "risk": None if withheld else ("phishing" if pred else "legitimate"),
+        "prediction": None if withheld else ("phishing" if pred else "legitimate"),
+        "url_only": withheld,
         "threshold": artifact.threshold,
         "model": artifact.model_name,
         "tier": args.tier,

@@ -26,13 +26,14 @@ def test_port_table():
 
 
 def test_tier_a_extractor_offline_and_ordered():
-    series, warnings = url_to_features("https://www.example.com/login", tier="A")
+    series, warnings, probe = url_to_features("https://www.example.com/login", tier="A")
     assert list(series.index) == FEATURE_COLUMNS
     assert series.dtype == "int64"
     # Tier A should not need a network call; warnings cover skipped tiers.
     skipped = {w.feature for w in warnings}
     assert "SSLfinal_State" in skipped
     assert "URL_of_Anchor" in skipped
+    assert probe.status == "not_probed"
 
 
 def test_redirect_csv_contract():
@@ -42,8 +43,10 @@ def test_redirect_csv_contract():
 
 @pytest.mark.network
 def test_full_extractor_example_com():
-    series, warnings = url_to_features("https://example.com/", tier="full")
+    series, warnings, probe = url_to_features("https://example.com/", tier="full")
     assert list(series.index) == FEATURE_COLUMNS
     assert series["having_IP_Address"] == 1
     dead = [w for w in warnings if w.feature in UNAVAILABLE_2026]
     assert len(dead) == 5
+    assert probe.status == "resolved"
+    assert probe.page_fetched or probe.tls_inspected

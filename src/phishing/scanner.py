@@ -23,6 +23,7 @@ from phishing.config import (
     VALUE_MEANING,
 )
 from phishing.features.extractor import url_to_features
+from phishing.features.reachability import LiveProbe
 from phishing.io import load_json
 from phishing.schema import FeatureWarning, ModelArtifact
 from phishing.tuning import load_model
@@ -136,7 +137,7 @@ def available_models() -> dict[str, dict[str, Any]]:
     }
 
 
-def _verdict(probability: float, warn: float, block: float) -> str:
+def _risk(probability: float, warn: float, block: float) -> str:
     if probability >= block:
         return "phishing"
     if probability >= warn:
@@ -144,6 +145,10 @@ def _verdict(probability: float, warn: float, block: float) -> str:
     if probability >= 0.25:
         return "probably safe"
     return "legitimate"
+
+
+def _withhold_risk(probe: LiveProbe) -> bool:
+    return probe.status in {"unreachable", "fetch_failed"}
 
 
 def _value_meaning(feature: str, encoded: int) -> str:
@@ -202,7 +207,19 @@ def _signals(
     return out
 
 
-def _rationale(verdict: str, signals: list[dict[str, Any]]) -> str:
+def _rationale(verdict: str, signals: list[dict[str, Any]], probe: LiveProbe) -> str:
+    if probe.status == "unreachable":
+        return (
+            "The hostname does not resolve, so this is not a live-site judgment. "
+            "DNS, TLS, and page fetch all failed; the score below is from the URL "
+            "string and placeholders only."
+        )
+    if probe.status == "fetch_failed":
+        return (
+            "The host has a DNS record, but the page could not be fetched and no "
+            "certificate was inspected. Risk is withheld; the score below is from "
+            "the URL string and placeholders only."
+        )
     top = [s["label"] for s in signals[:2] if s.get("label")]
     joined = " and ".join(top) if top else "the extracted URL features"
     if verdict == "phishing":
@@ -212,12 +229,12 @@ def _rationale(verdict: str, signals: list[dict[str, Any]]) -> str:
     return f"This looks legitimate; {joined} pulled the score toward the safe side."
 
 
-def _coverage(warning_map: dict[str, FeatureWarning], n_model_features: int) -> dict[str, Any]:
-    page_fetched = _measured("URL_of_Anchor", warning_map) or _measured("Request_URL", warning_map)
-    tls_checked = _measured("SSLfinal_State", warning_map)
+def _coverage(probe: LiveProbe, n_model_features: int) -> dict[str, Any]:
     return {
-        "page_fetched": page_fetched,
-        "tls_checked": tls_checked,
+        "reachability": probe.status,
+        "dns_ok": probe.dns_ok,
+        "page_fetched": probe.page_fetched,
+        "tls_checked": probe.tls_inspected,
         "features_used": n_model_features,
         "features_in_dataset": len(FEATURE_COLUMNS),
         "features_unavailable": len(UNAVAILABLE_2026),
@@ -245,12 +262,14 @@ def scan(url: str, timeout: int = 8) -> dict[str, Any]:
     normalised = _normalise_url(url)
     _assert_public_url(normalised)
     estimator, artifact = _loaded_model()
-    features, warnings = url_to_features(normalised, tier="full", timeout=timeout)
+    features, warnings, probe = url_to_features(normalised, tier="full", timeout=timeout)
     X = features[artifact.feature_names].to_frame().T
     probability = float(estimator.predict_proba(X)[:, 1][0])
     warn = float(artifact.threshold)
     block = float(artifact.extra.get("fpr_threshold", max(warn, 0.85)))
-    verdict = _verdict(probability, warn, block)
+    risk = _risk(probability, warn, block)
+    withheld = _withhold_risk(probe)
+    verdict = probe.status if withheld else risk
     warning_map = _warning_by_feature(warnings)
 
     signals: list[dict[str, Any]] = []
@@ -273,13 +292,16 @@ def scan(url: str, timeout: int = 8) -> dict[str, Any]:
     return {
         "url": normalised,
         "final_url": normalised,
+        "reachability": probe.to_dict(),
+        "risk": None if withheld else risk,
         "verdict": verdict,
+        "url_only": withheld,
         "probability": probability,
-        "rationale": _rationale(verdict, signals),
+        "rationale": _rationale(verdict, signals, probe),
         "notes": notes,
         "error": None,
         "signals": signals,
-        "coverage": _coverage(warning_map, len(artifact.feature_names)),
+        "coverage": _coverage(probe, len(artifact.feature_names)),
         "model": artifact.model_name,
         "model_quality": {
             "accuracy": float(metrics.get("accuracy", 0.0)),
@@ -289,7 +311,9 @@ def scan(url: str, timeout: int = 8) -> dict[str, Any]:
             "warn_threshold": warn,
             "block_threshold": block,
         },
-        "prediction": "phishing" if probability >= warn else "legitimate",
+        "prediction": (
+            None if withheld else ("phishing" if probability >= warn else "legitimate")
+        ),
         "threshold": warn,
         "warnings": [w.to_dict() for w in warnings],
         "features": features.to_dict(),

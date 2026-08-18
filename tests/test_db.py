@@ -70,6 +70,20 @@ def test_stats_counts_verdicts(db):
     assert stats["daily"][0]["scans"] == 2
 
 
+def test_stats_mean_probability_ignores_unreachable(db):
+    db.record_scan(sample_result())
+    dead = sample_result("https://no-such-host.invalid/")
+    dead["verdict"] = "unreachable"
+    dead["probability"] = 0.003
+    db.record_scan(dead)
+
+    stats = db.scan_stats()
+    assert stats["verdicts"]["unreachable"] == 1
+    assert stats["verdicts"]["suspicious"] == 1
+    assert stats["daily"][0]["scans"] == 2
+    assert stats["daily"][0]["mean_probability"] == pytest.approx(0.62)
+
+
 def test_record_scan_never_raises(db, monkeypatch):
     """A telemetry failure must not turn a successful scan into an error."""
 

@@ -56,15 +56,15 @@
           </svg>
           <div class="gauge-label">
             <strong id="gauge-value">—</strong>
-            <span>phishing<br>probability</span>
+            <span id="gauge-caption">phishing<br>probability</span>
           </div>
         </div>
       </div>
 
       <div id="notes" class="notes"></div>
 
-      <h3 class="section-title">Why the model decided this</h3>
-      <p class="section-sub">
+      <h3 class="section-title" id="signals-title">Why the model decided this</h3>
+      <p class="section-sub" id="signals-sub">
         Each bar is a SHAP value: how far that single signal pushed the score, in log-odds,
         away from the model's average prediction.
       </p>

@@ -64,6 +64,17 @@ const BADGE_CLASS = {
   suspicious: 'is-suspicious',
   'probably safe': 'is-safe',
   legitimate: 'is-safe',
+  unreachable: 'is-unknown',
+  fetch_failed: 'is-unknown',
+};
+
+const VERDICT_LABEL = {
+  phishing: 'phishing',
+  suspicious: 'suspicious',
+  'probably safe': 'probably safe',
+  legitimate: 'legitimate',
+  unreachable: 'unreachable',
+  fetch_failed: 'fetch failed',
 };
 
 const GAUGE_COLOUR = {
@@ -71,14 +82,23 @@ const GAUGE_COLOUR = {
   suspicious: '#f5a524',
   'probably safe': '#35c98b',
   legitimate: '#35c98b',
+  unreachable: '#8b9aad',
+  fetch_failed: '#8b9aad',
 };
+
+const LIVE_SIGNALS_TITLE = 'Why the model decided this';
+const LIVE_SIGNALS_SUB =
+  "Each bar is a SHAP value: how far that single signal pushed the score, in log-odds, away from the model's average prediction.";
+const URL_ONLY_SIGNALS_TITLE = 'URL-string score (host not observed)';
+const URL_ONLY_SIGNALS_SUB =
+  'The model still scored the URL string and placeholder features. That number is not a live-site judgment.';
 
 function render(result) {
   $('#result').hidden = false;
 
   const badge = $('#verdict-badge');
-  badge.textContent = result.verdict;
-  badge.className = `badge ${BADGE_CLASS[result.verdict] || ''}`;
+  badge.textContent = VERDICT_LABEL[result.verdict] || result.verdict;
+  badge.className = `badge ${BADGE_CLASS[result.verdict] || 'is-unknown'}`;
 
   $('#verdict-url').textContent = result.final_url;
   $('#verdict-rationale').textContent = result.rationale;
@@ -86,8 +106,17 @@ function render(result) {
   const pct = result.probability * 100;
   $('#gauge-value').textContent = `${pct.toFixed(pct < 1 ? 2 : 0)}%`;
   const arc = $('#gauge-arc');
-  arc.style.stroke = GAUGE_COLOUR[result.verdict] || '#35c98b';
+  arc.style.stroke = GAUGE_COLOUR[result.verdict] || '#8b9aad';
   arc.style.strokeDashoffset = GAUGE_CIRCUMFERENCE * (1 - result.probability);
+  const caption = $('#gauge-caption');
+  caption.innerHTML = result.url_only ? 'URL-string<br>score' : 'phishing<br>probability';
+
+  $('#signals-title').textContent = result.url_only
+    ? URL_ONLY_SIGNALS_TITLE
+    : LIVE_SIGNALS_TITLE;
+  $('#signals-sub').textContent = result.url_only
+    ? URL_ONLY_SIGNALS_SUB
+    : LIVE_SIGNALS_SUB;
 
   const notes = $('#notes');
   notes.innerHTML = '';
@@ -103,7 +132,11 @@ function render(result) {
   renderSignals(result.signals);
 
   const c = result.coverage;
+  const reach = VERDICT_LABEL[c.reachability] || c.reachability || '—';
+  const dnsLabel = c.dns_ok == null ? 'not probed' : (c.dns_ok ? 'yes' : 'no');
   fillList('#coverage', [
+    ['Reachability', reach],
+    ['DNS resolved', dnsLabel],
     ['Page downloaded', c.page_fetched ? 'yes' : 'no'],
     ['Certificate inspected', c.tls_checked ? 'yes' : 'no'],
     ['Signals used', `${c.features_used} of ${c.features_in_dataset}`],

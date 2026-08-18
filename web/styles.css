@@ -154,6 +154,7 @@ body {
 .badge.is-phishing { color: var(--danger); background: rgba(255, 95, 86, .1); }
 .badge.is-suspicious { color: var(--warn); background: rgba(245, 165, 36, .1); }
 .badge.is-safe { color: var(--safe); background: rgba(53, 201, 139, .1); }
+.badge.is-unknown { color: var(--muted); background: rgba(139, 154, 173, .14); }
 
 #verdict-url {
   margin: 0 0 8px; font-size: 18px; font-weight: 600;

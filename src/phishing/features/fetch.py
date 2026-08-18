@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 import requests
 from bs4 import BeautifulSoup
 
+from phishing.features.reachability import classify_network_error
+
 USER_AGENT = (
     "MaliciousURLAnalysis/0.1 (+research; contact: local) "
     "Mozilla/5.0 (compatible; phishing-feature-extractor)"
@@ -27,6 +29,7 @@ class FetchResult:
     n_redirects: int
     history_urls: list[str] = field(default_factory=list)
     error: str | None = None
+    error_kind: str | None = None
     content_type: str = ""
 
 
@@ -86,6 +89,7 @@ def fetch_page(
             soup=None,
             n_redirects=0,
             error=f"{type(exc).__name__}: {exc}",
+            error_kind=classify_network_error(exc),
         )
     finally:
         session.close()

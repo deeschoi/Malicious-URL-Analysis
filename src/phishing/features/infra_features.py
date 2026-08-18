@@ -59,10 +59,12 @@ def _registered(url: str) -> str:
     return f"{ext.domain}.{ext.suffix}".lower() if ext.suffix else ext.domain.lower()
 
 
-def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> int:
+def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> tuple[int, bool]:
+    """Return ``(encoding, inspected)``. ``inspected`` is True only after a handshake."""
+
     host, port, scheme = _host_port(url)
     if scheme != "https":
-        return PHISHING
+        return PHISHING, False
     port = port or 443
     try:
         ctx = ssl.create_default_context()
@@ -73,9 +75,9 @@ def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> int:
         warnings.append(
             FeatureWarning("SSLfinal_State", f"TLS handshake failed: {exc}", PHISHING)
         )
-        return PHISHING
+        return PHISHING, False
     if not cert:
-        return PHISHING
+        return PHISHING, True
     issuer_parts = []
     for rdn in cert.get("issuer", ()):
         for _key, value in rdn:
@@ -93,10 +95,10 @@ def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> int:
         except ValueError:
             age_ok = False
     if trusted and age_ok:
-        return LEGITIMATE
+        return LEGITIMATE, True
     if scheme == "https":
-        return SUSPICIOUS
-    return PHISHING
+        return SUSPICIOUS, True
+    return PHISHING, True
 
 
 def _whois_record(url: str):
@@ -209,24 +211,28 @@ def unavailable_features() -> tuple[dict[str, int], list[FeatureWarning]]:
     return values, warnings
 
 
-def extract_infra_features(url: str) -> tuple[dict[str, int], list[FeatureWarning]]:
+def extract_infra_features(
+    url: str,
+) -> tuple[dict[str, int], list[FeatureWarning], bool, bool]:
     warnings: list[FeatureWarning] = []
     record = None
     try:
         record = _whois_record(url)
     except Exception as exc:  # noqa: BLE001
         warnings.append(FeatureWarning("WHOIS", f"WHOIS lookup failed: {exc}", 0))
+    ssl_encoding, tls_inspected = ssl_final_state(url, warnings)
+    dns_encoding = dns_record(url, warnings)
     values = {
-        "SSLfinal_State": ssl_final_state(url, warnings),
+        "SSLfinal_State": ssl_encoding,
         "Domain_registeration_length": domain_registration_length(
             url, warnings, record=record
         ),
         "port": port_feature(url),
         "Abnormal_URL": abnormal_url(url, warnings, record=record),
         "age_of_domain": age_of_domain(url, warnings, record=record),
-        "DNSRecord": dns_record(url, warnings),
+        "DNSRecord": dns_encoding,
     }
     dead, dead_warnings = unavailable_features()
     values.update(dead)
     warnings.extend(dead_warnings)
-    return values, warnings
+    return values, warnings, dns_encoding == LEGITIMATE, tls_inspected
