@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import socket
 import ssl
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 import tldextract
@@ -89,9 +89,9 @@ def ssl_final_state(url: str, warnings: list[FeatureWarning]) -> tuple[int, bool
     if not_before:
         try:
             start = datetime.strptime(not_before, "%b %d %H:%M:%S %Y %Z").replace(
-                tzinfo=timezone.utc
+                tzinfo=UTC
             )
-            age_ok = (datetime.now(timezone.utc) - start).days >= 365
+            age_ok = (datetime.now(UTC) - start).days >= 365
         except ValueError:
             age_ok = False
     if trusted and age_ok:
@@ -122,8 +122,8 @@ def domain_registration_length(
             )
             return PHISHING
         if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        remaining = (exp - datetime.now(timezone.utc)).days
+            exp = exp.replace(tzinfo=UTC)
+        remaining = (exp - datetime.now(UTC)).days
         return PHISHING if remaining <= 365 else LEGITIMATE
     except Exception as exc:  # noqa: BLE001
         warnings.append(
@@ -143,8 +143,8 @@ def age_of_domain(url: str, warnings: list[FeatureWarning], record=None) -> int:
             warnings.append(FeatureWarning("age_of_domain", "no creation date in WHOIS", PHISHING))
             return PHISHING
         if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-        age_days = (datetime.now(timezone.utc) - created).days
+            created = created.replace(tzinfo=UTC)
+        age_days = (datetime.now(UTC) - created).days
         return LEGITIMATE if age_days >= 180 else PHISHING
     except Exception as exc:  # noqa: BLE001
         warnings.append(FeatureWarning("age_of_domain", f"WHOIS failed: {exc}", 0))

@@ -13,7 +13,7 @@ model degrades gracefully rather than needing a separate fallback estimator.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sklearn.base import clone
 
@@ -80,7 +80,7 @@ def main() -> None:
     print(f"\n  saved to {path}")
 
     card = {
-        "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "dataset": "UCI Phishing Websites (Mohammad, Thabtah & McCluskey, 2012)",
         "n_rows": int(len(X)),
         "evaluation": "grouped holdout; no feature pattern shared between train and test",

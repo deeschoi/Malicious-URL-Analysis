@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -108,7 +108,7 @@ def persist_model(
         feature_names=list(feature_names),
         threshold=float(threshold),
         metrics={k: float(v) for k, v in metrics.items()},
-        trained_at=datetime.now(timezone.utc).isoformat(),
+        trained_at=datetime.now(UTC).isoformat(),
         notes=notes,
         extra=extra or {},
     )
