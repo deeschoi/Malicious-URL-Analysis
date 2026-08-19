@@ -74,6 +74,29 @@ jobs:
       - name: Import every entry point
         run: python scripts/check_imports.py
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck, test, and build
+        run: |
+          npx tsc --noEmit
+          npm test
+          npm run build
+
   docker:
     # Trains the model as part of the build, so this also proves the pipeline
     # runs end to end on a clean checkout.
@@ -106,4 +129,6 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8000/api/model | head -c 400
+          curl -fsS http://127.0.0.1:8000/ | grep -q "Phishing URL Scanner"
+          curl -fsS http://127.0.0.1:8000/history | grep -q "Phishing URL Scanner"
           docker rm -f scanner

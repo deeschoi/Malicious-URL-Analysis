@@ -17,3 +17,5 @@ reports/figures
 .DS_Store
 htmlcov
 .coverage
+web/node_modules
+web/dist

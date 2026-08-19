@@ -8,14 +8,24 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from phishing.db import init_db, recent_scans, record_scan, scan_stats
 from phishing.scanner import UnsafeTargetError, available_models, research_findings, scan
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+ROOT = Path(__file__).resolve().parent.parent
+DIST_DIR = ROOT / "web" / "dist"
+_RESERVED_FRONTEND = {"api", "docs", "redoc", "openapi.json"}
+
+MISSING_FRONTEND = """<!doctype html>
+<title>Frontend not built</title>
+<p>The React UI has not been built. From the repo root:</p>
+<pre>cd web &amp;&amp; npm install &amp;&amp; npm run build</pre>
+<p>Or run the Vite dev server on port 5173 while this API is on 8000.</p>
+"""
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -102,9 +112,42 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-if WEB_DIR.exists():
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+def _frontend_file(relative: str) -> Path | None:
+    if not relative:
+        return None
+    candidate = (DIST_DIR / relative).resolve()
+    try:
+        candidate.relative_to(DIST_DIR.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
 
-    @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(WEB_DIR / "index.html")
+
+def _frontend_index():
+    index_path = DIST_DIR / "index.html"
+    if index_path.is_file():
+        return FileResponse(index_path)
+    return HTMLResponse(MISSING_FRONTEND, status_code=503)
+
+
+@app.get("/")
+def index():
+    """Serve the built React app, or a short how-to if it has not been built."""
+    return _frontend_index()
+
+
+@app.get("/{full_path:path}")
+def spa(full_path: str):
+    """Client-side routes (/history, /stats, /findings) all share index.html."""
+    first = full_path.split("/", 1)[0]
+    if first in _RESERVED_FRONTEND:
+        raise HTTPException(status_code=404, detail="Not found")
+    direct = _frontend_file(full_path)
+    if direct is not None:
+        return FileResponse(direct)
+    return _frontend_index()
+
+
+_assets = DIST_DIR / "assets"
+if _assets.is_dir():
+    app.mount("/assets", StaticFiles(directory=_assets), name="assets")

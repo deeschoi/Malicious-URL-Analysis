@@ -14,3 +14,5 @@ data/
 reports/figures/
 .coverage
 htmlcov/
+web/node_modules/
+web/dist/

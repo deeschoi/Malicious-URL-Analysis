@@ -171,15 +171,25 @@ python analysis/06_train_final.py            # persist artifacts/model.joblib
 
 ### Local website
 
-The scanner UI is not hosted anywhere. After the venv is active and `artifacts/model.joblib` exists (`phishing train --tune` if you have not trained yet):
+The scanner UI is a React app in `web/`. FastAPI serves the production build from `web/dist`. After the venv is active and `artifacts/model.joblib` exists (`phishing train --tune` if you have not trained yet):
 
 ```bash
+cd web && npm install && npm run build && cd ..
 uvicorn api.main:app --reload --port 8000
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in a browser. You should see **Phishing URL Scanner** with a URL field and a **Research findings** tab. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). You should see **Phishing URL Scanner** with **Scanner**, **History**, **Stats**, and **Research findings** tabs. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
 
-Or in a container. The image trains the model during the build, so it is reproducible from source alone and needs no pre-built artifact:
+While iterating on the UI, run Vite against a live API:
+
+```bash
+uvicorn api.main:app --reload --port 8000   # terminal 1
+cd web && npm run dev                       # terminal 2, http://127.0.0.1:5173
+```
+
+Vite proxies `/api` to port 8000. History and stats stay empty until you scan at least one URL.
+
+Or in a container. The image trains the model and builds the UI during the build, so it is reproducible from source alone and needs no pre-built artifact:
 
 ```bash
 docker compose up --build                     # SQLite, data in a named volume
@@ -198,7 +208,7 @@ docker compose --profile postgres up --build  # with Postgres alongside
 
 ### Scan telemetry
 
-Every scan is logged so the API can report what it has seen and whether its score distribution is drifting: `GET /api/scans` for recent history, `GET /api/stats` for the verdict mix and mean probability per day. Query strings are stripped before storage because they routinely carry session tokens; a SHA-256 of the full URL is kept so repeat scans can still be counted. A logging failure never fails a scan.
+Every scan is logged so the API can report what it has seen and whether its score distribution is drifting: `GET /api/scans` for recent history, `GET /api/stats` for the verdict mix and mean probability per day. The **History** and **Stats** tabs in the UI consume those endpoints. Query strings are stripped before storage because they routinely carry session tokens; a SHA-256 of the full URL is kept so repeat scans can still be counted. A logging failure never fails a scan.
 
 Research outputs stay as files in `reports/`. They are artifacts of a pipeline run, not telemetry, and gain nothing from a schema.
 
@@ -229,7 +239,7 @@ src/phishing/
   features/                   live extractor (fetch, URL, HTML, TLS/WHOIS)
 analysis/                     numbered research scripts → reports/
 api/main.py                   FastAPI service (scan, scans, stats, findings)
-web/                          vanilla JS scanner UI served by the API
+web/                          React + Vite + TypeScript UI (build → web/dist)
 migrations/                   alembic revisions for the scans table
 scripts/check_imports.py      CI guard: every entry point still imports
 tests/                        pytest, network tests marked skippable

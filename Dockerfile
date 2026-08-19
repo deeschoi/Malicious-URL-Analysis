@@ -1,6 +1,7 @@
 # The served model is gitignored, so the image trains it during the build. That
 # keeps the image self-contained and reproducible from source alone: the model
-# always matches the code and dataset in the same commit.
+# always matches the code and dataset in the same commit. The React UI is built
+# in a separate Node stage and copied into the runtime image as static files.
 FROM python:3.12-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
@@ -29,6 +30,17 @@ RUN pip install . --no-deps
 RUN python analysis/06_train_final.py
 
 
+FROM node:22-alpine AS frontend
+
+WORKDIR /web
+
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+
+COPY web/ ./
+RUN npm run build
+
+
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -47,10 +59,10 @@ COPY --from=builder /opt/venv /opt/venv
 
 COPY Training_Dataset.csv ./
 COPY api/ ./api/
-COPY web/ ./web/
 COPY reports/ ./reports/
 COPY --from=builder /build/artifacts/ ./artifacts/
 COPY --from=builder /build/reports/06_model_card.json ./reports/06_model_card.json
+COPY --from=frontend /web/dist ./web/dist
 
 RUN chown -R scanner:scanner /app
 USER scanner

@@ -1,104 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phishing URL Scanner</title>
-<link rel="stylesheet" href="/static/styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128737;</text></svg>">
-</head>
-<body>
-
-<header class="masthead">
-  <div class="wrap">
-    <div class="brand">
-      <span class="brand-mark"></span>
-      <div>
-        <h1>Phishing URL Scanner</h1>
-        <p>Gradient-boosted classifier over the UCI Phishing Websites feature set, with per-signal attribution.</p>
-      </div>
-    </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab is-active" data-view="scanner" role="tab">Scanner</button>
-      <button class="tab" data-view="findings" role="tab">Research findings</button>
-    </nav>
-  </div>
-</header>
-
-<main class="wrap">
-
-  <section id="view-scanner" class="view is-active">
-    <form id="scan-form" class="scanbar" autocomplete="off">
-      <input id="url-input" type="text" placeholder="Paste a URL, for example github.com or https://example.com"
-             aria-label="URL to scan" spellcheck="false">
-      <button id="scan-button" type="submit">Scan</button>
-    </form>
-    <p class="examples">
-      Try:
-      <button class="chip" data-url="https://www.wikipedia.org">wikipedia.org</button>
-      <button class="chip" data-url="http://neverssl.com">neverssl.com</button>
-      <button class="chip" data-url="https://github.com/python/cpython">github.com</button>
-    </p>
-
-    <div id="status" class="status" hidden></div>
-
-    <article id="result" class="result" hidden>
-      <div class="verdict-card">
-        <div class="verdict-main">
-          <span id="verdict-badge" class="badge">—</span>
-          <h2 id="verdict-url">—</h2>
-          <p id="verdict-rationale" class="rationale">—</p>
-        </div>
-        <div class="gauge">
-          <svg viewBox="0 0 120 120" class="gauge-svg" aria-hidden="true">
-            <circle class="gauge-track" cx="60" cy="60" r="52"></circle>
-            <circle id="gauge-arc" class="gauge-arc" cx="60" cy="60" r="52"></circle>
-          </svg>
-          <div class="gauge-label">
-            <strong id="gauge-value">—</strong>
-            <span id="gauge-caption">phishing<br>probability</span>
-          </div>
-        </div>
-      </div>
-
-      <div id="notes" class="notes"></div>
-
-      <h3 class="section-title" id="signals-title">Why the model decided this</h3>
-      <p class="section-sub" id="signals-sub">
-        Each bar is a SHAP value: how far that single signal pushed the score, in log-odds,
-        away from the model's average prediction.
-      </p>
-      <ul id="signals" class="signals"></ul>
-
-      <div class="meta-grid">
-        <div class="meta-card">
-          <h4>Scan coverage</h4>
-          <dl id="coverage"></dl>
-        </div>
-        <div class="meta-card">
-          <h4>Model reliability</h4>
-          <dl id="quality"></dl>
-        </div>
-      </div>
-    </article>
-  </section>
-
-  <section id="view-findings" class="view">
-    <div id="findings" class="findings">
-      <p class="status">Loading findings…</p>
-    </div>
-  </section>
-
-</main>
-
-<footer class="wrap footer">
-  <p>
-    Trained on the UCI Phishing Websites dataset (Mohammad, Thabtah &amp; McCluskey, 2012).
-    Accuracy figures come from a grouped hold-out split in which no duplicate feature
-    pattern is shared between training and test data.
-  </p>
-</footer>
-
-<script src="/static/app.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phishing URL Scanner</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128737;</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
