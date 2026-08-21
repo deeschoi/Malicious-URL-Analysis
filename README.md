@@ -116,6 +116,37 @@ PYTHONPATH=src python -m phishing.cli scan --tier A \
 # top SHAP: SSLfinal_State (filled 0 / suspicious because tier A skipped TLS)
 ```
 
+### Stage 5 — Live scan accuracy
+
+The model card reports 99.95% on a host-grouped holdout. That number is measured on the **frozen 2023 CSV columns**. `analysis/07_live_sample_eval.py` re-extracts every feature over the network instead, which is what the scanner actually does:
+
+```bash
+PYTHONPATH=src python analysis/07_live_sample_eval.py --seed 7 --n-per-class 120
+```
+
+Held-out sample, seed 7, 120 unique hosts per class (tuning was done on seed 42):
+
+| | Baseline | After |
+|---|---|---|
+| Accuracy | 0.878 | **0.906** |
+| Recall | 0.781 | 0.750 |
+| False-positive rate | 0.068 | **0.009** |
+| Precision | 0.862 | **0.980** |
+
+Of 240 hosts, 59 no longer resolve (56 of them phishing) — that churn, not the model, is the main limit on live recall.
+
+**What worked.** Ten legitimate sites scored p ≈ 1.0 because the page model's top weights (`NoOfExternalRef` 57%, `LineOfCode` 10%, `NoOfSelfRef` 9%) are exactly the columns that moved between 2023 and 2026. Raising the threshold cannot help at p = 1.0. Instead the scanner now scores the URL string separately and reconciles: when the page model says kit and the URL looks clean, the URL score wins. Measured on identical scans, that removes **all 10** false positives and costs **1 phishing host** (recall −1.6 points).
+
+Unreachable hosts previously got no rating at all. They now carry a `url_pattern_risk` chip — of the 59 unrated hosts, 54 are flagged as phishing-shaped URLs — rendered distinctly from the live verdict, because it is a judgment about the string and not about a page anyone fetched.
+
+**What was measured and rejected.** Three plausible changes made things worse and were backed out; the reasoning is in the code comments so they are not retried:
+
+- *A free-hosting-platform feature.* These suffixes cover 22,478 phishing rows and **1** legitimate row in PhiUSIIL. Trained as an input it became the #2 feature and scored real docs sites (`docs.github.io`, `nextjs.vercel.app`) at p ≈ 0.999. Kept only as a routing hint that stops the disagreement rule from excusing a kit on shared hosting.
+- *Counting subdomain depth against the platform suffix.* Cost 4.7 points of recall: it also lowers every kit parked on those same suffixes, which is the larger population.
+- *Widening the JS-shell heuristic and imputing all HTML features.* Cost 5.1 and 10.3 points of recall respectively. A phishing kit is also a thin page behind a few scripts, and `HasPasswordField` / `Bank` / `Pay` are genuinely measured on a kit's login page — replacing them with legitimate-class medians erases the evidence.
+
+A separate leak survives and is not fixed here: `TLDLegitimateProb` is 0.013 for `.io` and 0.0015 for `.app`, so real sites on those TLDs score 0.83–0.95 on the URL string alone. `tests/test_phiusiil.py` pins that behaviour so a future fix has a failing test to flip.
+
 ## How machine learning plays into this project
 
 Phishing detection here is supervised binary classification on a fixed, already-discretized feature space. That is why classical tabular models are the right tool: there is no raw HTML to embed and no sequence to tokenize until Stage 4 builds an extractor, and even then the extractor's job is to land in the same 30-dimensional encoding the 2012 paper defined.
@@ -178,7 +209,7 @@ cd web && npm install && npm run build && cd ..
 uvicorn api.main:app --reload --port 8000
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). You should see **Phishing URL Scanner** with **Scanner**, **History**, **Stats**, and **Research findings** tabs. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). You should see **Sphinx** with **Scanner**, **History**, **Stats**, and **Research findings** tabs. Opening `web/index.html` as a file will not work: the page talks to `/api/scan` on this server.
 
 While iterating on the UI, run Vite against a live API:
 
@@ -257,6 +288,8 @@ Dockerfile                    trains the model at build, serves via uvicorn
 - `SSLfinal_State` for live URLs uses a modern CA list (Let's Encrypt, DigiCert, …) on top of the 2012 names. That is the honest 2026 measurement, and it is *not* the same random variable the 2012 labels were built from.
 - Page fetches do not execute JavaScript, so `on_mouseover` / `RightClick` / `popUpWidnow` are source-text approximations.
 - Grouped CV is still i.i.d. across *patterns*, not across time. There is no temporal holdout in this dataset.
+- The served PhiUSIIL model's 99.95% grouped-holdout figure is measured on frozen 2023 columns. Live re-extraction in 2026 reads **90.6% accuracy / 75.0% recall / 0.9% FPR** (Stage 5). Treat the model-card number as an upper bound, not a deployment estimate.
+- Roughly a quarter of PhiUSIIL phishing hosts no longer resolve, so live recall is measured on a shrinking and non-random subset of the phishing class.
 
 ## References
 

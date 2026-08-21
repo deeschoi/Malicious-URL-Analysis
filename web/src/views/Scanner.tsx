@@ -5,6 +5,7 @@ import { Gauge } from "../components/Gauge";
 import { StatusMessage } from "../components/EmptyState";
 import { VerdictBadge } from "../components/VerdictBadge";
 import { pct, yesNo } from "../format";
+import { urlPatternClass, urlPatternLabel } from "../verdict";
 import type { ScanResult, Signal } from "../types";
 
 const EXAMPLES = [
@@ -19,6 +20,10 @@ const LIVE_SIGNALS_SUB =
 const URL_ONLY_SIGNALS_TITLE = "URL-string score (host not observed)";
 const URL_ONLY_SIGNALS_SUB =
   "The model still scored the URL string and placeholder features. That number is not a live-site judgment.";
+
+// Verdicts that are not a live-site rating. For these the scanner withholds a
+// risk band, so the URL-string judgment is the only thing it can offer.
+const WITHHELD_VERDICTS = new Set(["unreachable", "fetch_failed", "not_probed"]);
 
 export function Scanner() {
   const [params] = useSearchParams();
@@ -64,7 +69,7 @@ export function Scanner() {
           className="url-input"
           value={url}
           onChange={(event) => setUrl(event.target.value)}
-          placeholder="Paste a URL, for example github.com or https://example.com"
+          placeholder="Paste a URL for Sphinx to judge"
           aria-label="URL to scan"
           spellCheck={false}
         />
@@ -99,12 +104,24 @@ function ScanResultView({ result }: { result: ScanResult }) {
   const quality = result.model_quality;
   const notes = [...(result.notes ?? [])];
   if (result.error) notes.unshift(result.error);
+  // Only worth showing when there is no live verdict to show instead.
+  const patternRisk = WITHHELD_VERDICTS.has(result.verdict)
+    ? result.url_pattern_risk
+    : null;
 
   return (
     <article className="result">
       <div className="verdict-card">
         <div className="verdict-main">
           <VerdictBadge verdict={result.verdict} />
+          {patternRisk ? (
+            <span
+              className={`badge-url-pattern ${urlPatternClass(patternRisk)}`}
+              title="How the URL string alone scores. The site itself was not reachable, so this is not a live-page judgment."
+            >
+              {urlPatternLabel(patternRisk)}
+            </span>
+          ) : null}
           <h2 className="verdict-url">{result.final_url}</h2>
           <p className="rationale">{result.rationale}</p>
         </div>

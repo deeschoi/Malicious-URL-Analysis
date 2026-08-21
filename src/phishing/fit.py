@@ -121,8 +121,30 @@ def train_phiusiil_model(*, model_name: str = MODEL_NAME) -> dict[str, Any]:
             "features nearly separate the classes on the frozen table. The "
             "scanner uses a URL-only fallback when HTML is missing, ignores "
             "www as a subdomain, extra special character, or path/slash leak, "
-            "and never scores placeholder zeros as a kit."
+            "and never scores placeholder zeros as a kit. The held-out numbers "
+            "here are measured on the frozen 2023 columns and do not transfer "
+            "to live 2026 scans: on a 240-host live sample (analysis/07, seed "
+            "7) the scanner reads 90.6% accuracy, 75.0% recall, 0.9% FPR, with "
+            "59 of 240 hosts no longer resolving. Two known leaks survive in "
+            "the table: TLDLegitimateProb is near zero for .app / .io, so real "
+            "sites on those TLDs score high on the URL string alone, and free "
+            "hosting suffixes carry 22,478 phishing rows against 1 legitimate "
+            "row (kept out of the feature set for that reason)."
         ),
+        "live_sample": {
+            "script": "analysis/07_live_sample_eval.py",
+            "seed": 7,
+            "n_per_class": 120,
+            "accuracy": 0.906,
+            "recall": 0.750,
+            "false_positive_rate": 0.009,
+            "precision": 0.980,
+            "unrated_hosts": 59,
+            "note": (
+                "Live re-extraction over the network, not the frozen CSV. "
+                "Rated hosts only; unreachable hosts get a URL-pattern chip."
+            ),
+        },
     }
     path = persist_model(
         served,
@@ -134,7 +156,10 @@ def train_phiusiil_model(*, model_name: str = MODEL_NAME) -> dict[str, Any]:
             "PhiUSIIL 48-feature model plus URL-only fallback. Host-grouped "
             "holdout; refitted on the full table. URL features recomputed so "
             "www is not a class leak (subdomain, special-char count, or path). "
-            "Missing HTML is not filled with zeros."
+            "Missing HTML is not filled with zeros. At scan time the two "
+            "estimators are reconciled: when the page model says kit but the "
+            "URL string looks clean, the URL score wins, because the page "
+            "model's top weights are the columns that shifted since 2023."
         ),
         extra=extra,
         extra_estimators={"url_estimator": url_served},
@@ -165,6 +190,7 @@ def train_phiusiil_model(*, model_name: str = MODEL_NAME) -> dict[str, Any]:
         "dropped_leaks": extra["dropped"],
         "https_encoding": extra["https_encoding"],
         "limitation": extra["limitation"],
+        "live_sample": extra["live_sample"],
         "top_importances": dict(list(importances.items())[:12]),
         "artifact": str(path),
     }

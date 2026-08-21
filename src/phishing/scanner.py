@@ -22,6 +22,7 @@ from phishing.config import (
     VALUE_MEANING,
 )
 from phishing.features.extractor import url_to_phiusiil_features
+from phishing.features.phiusiil_url import is_free_hosting_platform
 from phishing.features.reachability import LiveProbe
 from phishing.io import load_json, to_jsonable
 from phishing.schema import FeatureWarning, ModelArtifact
@@ -228,17 +229,32 @@ def _signals(
     return out
 
 
-def _rationale(verdict: str, signals: list[dict[str, Any]], probe: LiveProbe) -> str:
+def _url_pattern_phrase(url_pattern_risk: str | None) -> str:
+    if url_pattern_risk == "phishing":
+        return " The URL pattern itself looks like phishing."
+    if url_pattern_risk == "suspicious":
+        return " The URL pattern itself looks suspicious."
+    if url_pattern_risk == "legitimate":
+        return " The URL pattern itself does not look like phishing."
+    return ""
+
+
+def _rationale(
+    verdict: str,
+    signals: list[dict[str, Any]],
+    probe: LiveProbe,
+    url_pattern_risk: str | None = None,
+) -> str:
     if probe.status == "unreachable":
         return (
             "The hostname does not resolve, so this is not a live-site judgment. "
             "DNS, TLS, and page fetch all failed; the score below is from the URL "
-            "string and placeholders only."
+            "string and placeholders only." + _url_pattern_phrase(url_pattern_risk)
         )
     if probe.status == "not_probed":
         return (
             "The page was not fetched. Risk is withheld; the score below is from "
-            "the URL string only."
+            "the URL string only." + _url_pattern_phrase(url_pattern_risk)
         )
     if verdict in {"phishing", "suspicious"}:
         top = [
@@ -358,6 +374,47 @@ def scan(
 
     X = features[feature_names].to_frame().T
     probability = float(scorer.predict_proba(X)[:, 1][0])
+
+    # Score the URL string on its own regardless of which model is serving.
+    # It backs the disagreement rule below and the qualified verdict the UI
+    # shows when the host never resolved.
+    url_warn = float(artifact.extra.get("url_threshold", artifact.threshold))
+    url_block = float(artifact.extra.get("url_fpr_threshold", max(url_warn, 0.85)))
+    url_feature_names = list(artifact.extra.get("url_features") or PHIUSIIL_URL_FEATURES)
+    page_probability: float | None = None
+    url_probability: float | None = None
+    if url_estimator is not None:
+        if use_url_only:
+            url_probability = probability
+        else:
+            page_probability = probability
+            url_row = features[url_feature_names].to_frame().T
+            url_probability = float(url_estimator.predict_proba(url_row)[:, 1][0])
+
+    url_pattern_risk = (
+        _risk(url_probability, url_warn, url_block) if url_probability is not None else None
+    )
+
+    # The page model's top weights (NoOfExternalRef 57%, LineOfCode 10%,
+    # NoOfSelfRef 9%) are exactly the columns that moved between the 2023 crawl
+    # and 2026 markup, so a rich modern homepage can pin at p ≈ 1.0. When the
+    # URL string looks clean, that disagreement is drift, not evidence.
+    #
+    # Gated on the free-hosting hint: a kit on firebaseapp.com has a clean-
+    # looking URL by construction, and must not be talked down this way.
+    disagreement = False
+    if (
+        not use_url_only
+        and page_probability is not None
+        and url_probability is not None
+        and page_probability >= block
+        and url_probability < url_warn
+        and not is_free_hosting_platform(normalised)
+    ):
+        disagreement = True
+        probability = url_probability
+        model_label = f"{artifact.model_name} (URL disagreement)"
+
     risk = _risk(probability, warn, block)
     verdict = probe.status if withheld else risk
     warning_map = _warning_by_feature(warnings)
@@ -377,6 +434,14 @@ def scan(
     notes = _notes(warnings)
     if shap_error:
         notes.insert(0, shap_error)
+    if disagreement:
+        notes.insert(
+            0,
+            "The page-content model scored this as phishing, but the URL string "
+            "on its own looks clean. That pattern is usually 2023-vs-2026 drift "
+            "in the page-richness features rather than evidence, so the score "
+            "shown is the URL-string score.",
+        )
     if use_url_only:
         if probe.status == "fetch_failed":
             fetch_note = (
@@ -402,7 +467,11 @@ def scan(
         "verdict": verdict,
         "url_only": use_url_only,
         "probability": probability,
-        "rationale": _rationale(verdict, signals, probe),
+        "page_probability": page_probability,
+        "url_probability": url_probability,
+        "url_pattern_risk": url_pattern_risk,
+        "url_disagreement": disagreement,
+        "rationale": _rationale(verdict, signals, probe, url_pattern_risk),
         "notes": notes,
         "error": None,
         "signals": signals,

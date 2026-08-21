@@ -43,6 +43,14 @@ export interface ScanResult {
   verdict: Verdict;
   url_only: boolean;
   probability: number;
+  /** Page-model score before any disagreement fallback; null when HTML was not measured. */
+  page_probability?: number | null;
+  /** URL-string-only score, always present when the fallback model is loaded. */
+  url_probability?: number | null;
+  /** Judgment of the URL string alone. Not a live-site verdict. */
+  url_pattern_risk?: Verdict | null;
+  /** True when the URL-string score replaced a high page-model score. */
+  url_disagreement?: boolean;
   rationale: string;
   notes: string[];
   error: string | null;

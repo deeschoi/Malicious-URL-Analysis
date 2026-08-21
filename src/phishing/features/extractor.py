@@ -40,7 +40,14 @@ def _neutral_fill(
 
 
 def _looks_like_js_shell(values: dict[str, float]) -> bool:
-    """True when markup is script-heavy but almost has no crawlable links."""
+    """True when markup is script-heavy but almost has no crawlable links.
+
+    Deliberately narrow. Widening this to fire on "self-refs low relative to
+    script/CSS volume" was measured on the seed-42 live sample and cost 5.1
+    points of recall for no FPR gain: a phishing kit is *also* a thin page
+    behind a few scripts, so the ratio catches the kits along with the
+    CDN-heavy legitimate pages it was meant for. See analysis/07.
+    """
     links = float(values.get("NoOfExternalRef", 0)) + float(values.get("NoOfSelfRef", 0))
     scripts = float(values.get("NoOfJS", 0))
     loc = float(values.get("LineOfCode", 0))
@@ -52,6 +59,13 @@ def _impute_js_shell_links(
     fill: dict[str, float],
     warnings: list[FeatureWarning],
 ) -> None:
+    """Impute only the link-shaped columns, never the whole HTML block.
+
+    Filling all of PHIUSIIL_HTML_FEATURES here was measured on the seed-42
+    live sample and cost 10.3 points of recall: HasPasswordField, Bank, Pay
+    and the rest are genuinely measured on a kit's login page, and replacing
+    them with legitimate-class medians erases the evidence. See analysis/07.
+    """
     if not fill or not _looks_like_js_shell(values):
         return
     for name in PHIUSIIL_SPA_LINK_FEATURES:

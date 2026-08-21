@@ -10,6 +10,8 @@ import ipaddress
 import re
 from urllib.parse import unquote, urlparse
 
+from phishing.config import PHIUSIIL_PLATFORM_SUFFIXES
+
 _PERCENT = re.compile(r"%[0-9A-Fa-f]{2}")
 _ALNUM_RUN = re.compile(r"[A-Za-z0-9]+")
 
@@ -54,6 +56,31 @@ def char_continuation_rate(host: str, tld: str) -> float:
     runs = _ALNUM_RUN.findall(core)
     longest = max((len(run) for run in runs), default=0)
     return longest / len(core)
+
+
+def platform_suffix(host: str) -> str:
+    """Longest free-hosting suffix the hostname sits under, or "".
+
+    Longest wins so a nested suffix cannot be shadowed by a shorter one.
+    """
+    host = (host or "").lower().rstrip(".")
+    matches = [
+        suffix
+        for suffix in PHIUSIIL_PLATFORM_SUFFIXES
+        if host == suffix or host.endswith("." + suffix)
+    ]
+    return max(matches, key=len) if matches else ""
+
+
+def is_free_hosting_platform(url: str) -> int:
+    """1 when the hostname is published under shared free hosting.
+
+    A scanner routing hint, never a model feature — see the note on
+    ``PHIUSIIL_PLATFORM_SUFFIXES``. Subdomain depth is deliberately *not*
+    counted against these suffixes either; both were measured and rejected
+    in analysis/07.
+    """
+    return 1 if platform_suffix(_host(url)) else 0
 
 
 def _url_for_char_counts(url: str, host: str) -> str:

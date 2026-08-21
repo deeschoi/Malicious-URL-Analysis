@@ -129,6 +129,6 @@ jobs:
             sleep 2
           done
           curl -fsS http://127.0.0.1:8000/api/model | head -c 400
-          curl -fsS http://127.0.0.1:8000/ | grep -q "Phishing URL Scanner"
-          curl -fsS http://127.0.0.1:8000/history | grep -q "Phishing URL Scanner"
+          curl -fsS http://127.0.0.1:8000/ | grep -q "Sphinx"
+          curl -fsS http://127.0.0.1:8000/history | grep -q "Sphinx"
           docker rm -f scanner

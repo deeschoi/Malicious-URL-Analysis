@@ -23,8 +23,8 @@ export const GAUGE_COLOUR: Record<string, string> = {
   suspicious: "#f5a524",
   "probably safe": "#35c98b",
   legitimate: "#35c98b",
-  unreachable: "#8b9aad",
-  fetch_failed: "#8b9aad",
+  unreachable: "#a89478",
+  fetch_failed: "#a89478",
 };
 
 export const VERDICT_ORDER = [
@@ -45,5 +45,21 @@ export function badgeClass(verdict: string): string {
 }
 
 export function gaugeColour(verdict: string): string {
-  return GAUGE_COLOUR[verdict] ?? "#8b9aad";
+  return GAUGE_COLOUR[verdict] ?? "#a89478";
+}
+
+const URL_PATTERN_CLASS: Record<string, string> = {
+  phishing: "is-pattern-phishing",
+  suspicious: "is-pattern-suspicious",
+  "probably safe": "is-pattern-safe",
+  legitimate: "is-pattern-safe",
+};
+
+/** Styling for the URL-string chip. Never reuses the live-verdict classes. */
+export function urlPatternClass(risk: string): string {
+  return URL_PATTERN_CLASS[risk] ?? "";
+}
+
+export function urlPatternLabel(risk: string): string {
+  return `URL pattern: ${verdictLabel(risk)}`;
 }

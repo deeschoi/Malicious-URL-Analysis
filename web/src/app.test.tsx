@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EmptyState } from "./components/EmptyState";
+import { Layout } from "./components/Layout";
 import { FindingsView } from "./views/Findings";
 import { History } from "./views/History";
 import { Stats } from "./views/Stats";
@@ -136,5 +137,19 @@ describe("EmptyState", () => {
   it("renders the title", () => {
     render(<EmptyState title="Nothing here">Try again later.</EmptyState>);
     expect(screen.getByText("Nothing here")).toBeInTheDocument();
+  });
+});
+
+describe("Layout", () => {
+  it("renders the Sphinx wordmark", () => {
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Layout>
+          <p>child</p>
+        </Layout>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Sphinx" })).toBeInTheDocument();
+    expect(screen.getByText("URL Phishing Guardian")).toBeInTheDocument();
   });
 });

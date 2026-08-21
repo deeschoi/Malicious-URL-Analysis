@@ -59,7 +59,7 @@ export function History() {
       {loading ? <StatusMessage message="Loading scan history…" /> : null}
       {!loading && !error && scans.length === 0 ? (
         <EmptyState title="No scans yet">
-          Score a URL on the Scanner tab. Each result is logged here automatically.
+          Ask Sphinx to score a URL. Each result is logged here automatically.
         </EmptyState>
       ) : null}
       {!loading && scans.length > 0 ? (

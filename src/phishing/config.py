@@ -312,6 +312,37 @@ PHIUSIIL_DROP = [
     "URLCharProb",  # derived per-URL prior we cannot reproduce at scan time
 ]
 
+# Shared hosting where anyone can publish under someone else's apex. Kits use
+# these because the parent domain is already trusted and TLS is free.
+#
+# NOT a model feature. In PhiUSIIL these suffixes cover 22,478 phishing rows
+# and exactly 1 legitimate row, so a model trained on them learns
+# "platform ⇒ phishing" outright: with IsFreeHostingPlatform as an input the
+# URL-only estimator scored real docs sites (docs.github.io, nextjs.vercel.app)
+# at p ≈ 0.999 and ranked the feature second by importance. It is kept as a
+# scanner routing hint instead — it gates the URL-disagreement fallback so a
+# platform-hosted kit cannot be talked down to legitimate.
+PHIUSIIL_PLATFORM_SUFFIXES = [
+    "web.app",
+    "firebaseapp.com",
+    "repl.co",
+    "workers.dev",
+    "dweb.link",
+    "godaddysites.com",
+    "duckdns.org",
+    "webwave.dev",
+    "weebly.com",
+    "glitch.me",
+    "wixsite.com",
+    "yolasite.com",
+    "myportfolio.com",
+    "github.io",
+    "netlify.app",
+    "vercel.app",
+    "pages.dev",
+    "herokuapp.com",
+]
+
 # URL-string features: no network. IsHTTPS is the scheme bit, not the 2012
 # SSLfinal_State (trusted issuer + cert older than a year).
 PHIUSIIL_URL_FEATURES = [
@@ -411,6 +442,7 @@ PHIUSIIL_FEATURE_LABELS = {
     "IsHTTPS": "Uses HTTPS",
     "CharContinuationRate": "Uninterrupted character runs in the domain",
     "TLDLegitimateProb": "How common this TLD is among legitimate sites",
+    "IsFreeHostingPlatform": "Free shared-hosting platform",
     "LineOfCode": "HTML line count",
     "LargestLineLength": "Longest HTML line",
     "HasTitle": "Has a title",
@@ -448,6 +480,10 @@ VALUE_MEANING.update(
         "IsDomainIP": {0: "Hostname is a domain", 1: "Hostname is a raw IP"},
         "HasObfuscation": {0: "No percent-encoding", 1: "URL contains percent-encoding"},
         "IsHTTPS": {0: "HTTP (no TLS)", 1: "HTTPS"},
+        "IsFreeHostingPlatform": {
+            0: "Hosted on its own domain",
+            1: "Published on free shared hosting (anyone can register a subdomain)",
+        },
         "HasTitle": {0: "No title", 1: "Has a title"},
         "HasFavicon": {0: "No favicon", 1: "Has a favicon"},
         "Robots": {0: "No robots directives", 1: "Robots directives present"},
