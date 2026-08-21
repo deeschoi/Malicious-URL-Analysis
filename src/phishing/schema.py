@@ -12,7 +12,7 @@ class FeatureWarning:
 
     feature: str
     message: str
-    fallback: int
+    fallback: int | float
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

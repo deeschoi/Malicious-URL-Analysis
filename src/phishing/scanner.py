@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import math
 import socket
 from functools import lru_cache
 from typing import Any
@@ -14,19 +13,19 @@ import pandas as pd
 from phishing.config import (
     ARTIFACTS_DIR,
     DEAD_FEATURE_REASON,
-    FEATURE_COLUMNS,
     FEATURE_LABELS,
-    GENERIC_VALUE,
+    PHIUSIIL_MODEL_FEATURES,
+    PHIUSIIL_URL_FEATURES,
     REPORTS_DIR,
     REVERSED_FEATURES,
     UNAVAILABLE_2026,
     VALUE_MEANING,
 )
-from phishing.features.extractor import url_to_features
+from phishing.features.extractor import url_to_phiusiil_features
 from phishing.features.reachability import LiveProbe
-from phishing.io import load_json
+from phishing.io import load_json, to_jsonable
 from phishing.schema import FeatureWarning, ModelArtifact
-from phishing.tuning import load_model
+from phishing.tuning import load_payload
 
 BLOCKED_SCHEMES = {"file", "javascript", "data", "ftp", "mailto"}
 
@@ -36,13 +35,7 @@ class UnsafeTargetError(ValueError):
 
 
 def _clean_json(value: Any) -> Any:
-    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-        return None
-    if isinstance(value, dict):
-        return {k: _clean_json(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_clean_json(v) for v in value]
-    return value
+    return to_jsonable(value)
 
 
 def _normalise_url(url: str) -> str:
@@ -100,13 +93,18 @@ def _assert_public_url(url: str) -> None:
 
 
 @lru_cache(maxsize=1)
-def _loaded_model() -> tuple[Any, ModelArtifact]:
+def _loaded_payload() -> dict[str, Any]:
     path = ARTIFACTS_DIR / "model.joblib"
     if not path.exists():
         raise FileNotFoundError(
             f"No trained model at {path}. From the repo root run: python run.py train --tune"
         )
-    return load_model(path)
+    return load_payload(path)
+
+
+def _loaded_model() -> tuple[Any, ModelArtifact]:
+    payload = _loaded_payload()
+    return payload["estimator"], payload["artifact"]
 
 
 def available_models() -> dict[str, dict[str, Any]]:
@@ -148,12 +146,33 @@ def _risk(probability: float, warn: float, block: float) -> str:
 
 
 def _withhold_risk(probe: LiveProbe) -> bool:
-    return probe.status in {"unreachable", "fetch_failed"}
+    # DNS failure and offline scans are not live-site judgments. A fetch
+    # timeout still has a fully measured URL string (scheme, host, path).
+    return probe.status in {"unreachable", "not_probed"}
 
 
-def _value_meaning(feature: str, encoded: int) -> str:
-    meanings = VALUE_MEANING.get(feature, GENERIC_VALUE)
-    return meanings.get(encoded, GENERIC_VALUE.get(encoded, str(encoded)))
+def _html_measured(probe: LiveProbe) -> bool:
+    return bool(probe.page_fetched)
+
+
+def _format_feature_value(feature: str, encoded: object) -> str:
+    meanings = VALUE_MEANING.get(feature)
+    try:
+        as_int = int(encoded)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        as_int = None
+    if (
+        meanings is not None
+        and as_int is not None
+        and as_int in meanings
+        and float(encoded) == as_int  # type: ignore[arg-type]
+    ):
+        return meanings[as_int]
+    if isinstance(encoded, float) and not encoded.is_integer():
+        return f"{encoded:.3f}"
+    if isinstance(encoded, (int, float)):
+        return str(int(encoded))
+    return str(encoded)
 
 
 def _warning_by_feature(warnings: list[FeatureWarning]) -> dict[str, FeatureWarning]:
@@ -161,13 +180,14 @@ def _warning_by_feature(warnings: list[FeatureWarning]) -> dict[str, FeatureWarn
 
 
 def _measured(feature: str, warning_map: dict[str, FeatureWarning]) -> bool:
-    if feature in UNAVAILABLE_2026:
-        return False
     warning = warning_map.get(feature)
     if warning is None:
         return True
     message = warning.message.lower()
-    return not any(token in message for token in ("skipped", "failed", "retired", "not queried"))
+    return not any(
+        token in message
+        for token in ("skipped", "failed", "retired", "not queried", "unmeasured")
+    )
 
 
 def _signals(
@@ -184,22 +204,23 @@ def _signals(
     for i in order:
         name = feature_names[i]
         contribution = float(shap_row[i])
-        encoded = int(feature_row[name])
+        encoded = feature_row[name]
         warning = warning_map.get(name)
         measured = _measured(name, warning_map)
         toward = "phishing" if contribution >= 0 else "legitimate"
+        meaning = _format_feature_value(name, encoded)
         out.append(
             {
                 "feature": name,
                 "label": FEATURE_LABELS.get(name, name),
                 "contribution": contribution,
                 "measured": measured,
-                "value_meaning": _value_meaning(name, encoded),
+                "value_meaning": meaning,
                 "encoding_unreliable": name in REVERSED_FEATURES,
                 "evidence": (
                     warning.message
                     if warning and not measured
-                    else _value_meaning(name, encoded)
+                    else meaning
                 ),
                 "direction": f"pushed toward {toward}",
             }
@@ -214,19 +235,36 @@ def _rationale(verdict: str, signals: list[dict[str, Any]], probe: LiveProbe) ->
             "DNS, TLS, and page fetch all failed; the score below is from the URL "
             "string and placeholders only."
         )
-    if probe.status == "fetch_failed":
+    if probe.status == "not_probed":
         return (
-            "The host has a DNS record, but the page could not be fetched and no "
-            "certificate was inspected. Risk is withheld; the score below is from "
-            "the URL string and placeholders only."
+            "The page was not fetched. Risk is withheld; the score below is from "
+            "the URL string only."
         )
-    top = [s["label"] for s in signals[:2] if s.get("label")]
+    if verdict in {"phishing", "suspicious"}:
+        top = [
+            s["label"]
+            for s in signals
+            if s.get("label") and float(s.get("contribution", 0)) >= 0
+        ][:2]
+    else:
+        top = [
+            s["label"]
+            for s in signals
+            if s.get("label") and float(s.get("contribution", 0)) < 0
+        ][:2]
     joined = " and ".join(top) if top else "the extracted URL features"
     if verdict == "phishing":
-        return f"This looks like phishing mainly because of {joined}."
-    if verdict == "suspicious":
-        return f"This is in the warning band; {joined} moved the score toward phishing."
-    return f"This looks legitimate; {joined} pulled the score toward the safe side."
+        text = f"This looks like phishing mainly because of {joined}."
+    elif verdict == "suspicious":
+        text = f"This is in the warning band; {joined} moved the score toward phishing."
+    else:
+        text = f"This looks legitimate; {joined} pulled the score toward the safe side."
+    if probe.status == "fetch_failed":
+        text += (
+            " The page could not be fetched, so this is a URL-string score, not a "
+            "live-page judgment."
+        )
+    return text
 
 
 def _coverage(probe: LiveProbe, n_model_features: int) -> dict[str, Any]:
@@ -236,9 +274,18 @@ def _coverage(probe: LiveProbe, n_model_features: int) -> dict[str, Any]:
         "page_fetched": probe.page_fetched,
         "tls_checked": probe.tls_inspected,
         "features_used": n_model_features,
-        "features_in_dataset": len(FEATURE_COLUMNS),
-        "features_unavailable": len(UNAVAILABLE_2026),
+        "features_in_dataset": len(PHIUSIIL_MODEL_FEATURES),
+        "features_unavailable": 0,
     }
+
+
+_PLAIN_NOTES = (
+    (
+        "javascript shell",
+        "This page is mostly JavaScript with almost no static links. Those "
+        "missing links were not counted as a phishing signal.",
+    ),
+)
 
 
 def _notes(warnings: list[FeatureWarning]) -> list[str]:
@@ -247,28 +294,71 @@ def _notes(warnings: list[FeatureWarning]) -> list[str]:
     for warning in warnings:
         if warning.feature in UNAVAILABLE_2026:
             continue
-        if "skipped" in warning.message.lower():
+        low = warning.message.lower()
+        if "skipped" in low:
             continue
-        key = warning.message
-        if key in seen:
+        if "page fetch failed" in low or "content parse failed" in low:
             continue
-        seen.add(key)
-        notes.append(f"{FEATURE_LABELS.get(warning.feature, warning.feature)}: {warning.message}")
+        # Minified HTML is the common case for 2026 sites; keep the fill, skip the note.
+        if "minified html" in low:
+            continue
+        text = None
+        for needle, plain in _PLAIN_NOTES:
+            if needle in low:
+                text = plain
+                break
+        if text is None:
+            text = f"{FEATURE_LABELS.get(warning.feature, warning.feature)}: {warning.message}"
+        if text in seen:
+            continue
+        seen.add(text)
+        notes.append(text)
     return notes[:8]
 
 
-def scan(url: str, timeout: int = 8) -> dict[str, Any]:
+def scan(
+    url: str,
+    timeout: int = 8,
+    *,
+    tier: str = "full",
+    fetch=None,
+) -> dict[str, Any]:
     """Extract features, score with the deployable model, and explain the verdict."""
     normalised = _normalise_url(url)
     _assert_public_url(normalised)
-    estimator, artifact = _loaded_model()
-    features, warnings, probe = url_to_features(normalised, tier="full", timeout=timeout)
-    X = features[artifact.feature_names].to_frame().T
-    probability = float(estimator.predict_proba(X)[:, 1][0])
-    warn = float(artifact.threshold)
-    block = float(artifact.extra.get("fpr_threshold", max(warn, 0.85)))
-    risk = _risk(probability, warn, block)
+    payload = _loaded_payload()
+    estimator, artifact = payload["estimator"], payload["artifact"]
+    url_estimator = payload.get("url_estimator")
+    tld_prob = artifact.extra.get("tld_legit_prob") or {}
+    html_fill = artifact.extra.get("html_fill") or {}
+    features, warnings, probe = url_to_phiusiil_features(
+        normalised,
+        tier=tier,  # type: ignore[arg-type]
+        timeout=timeout,
+        fetch=fetch,
+        tld_prob=tld_prob,
+        html_fill=html_fill,
+    )
     withheld = _withhold_risk(probe)
+    use_url_only = withheld or not _html_measured(probe)
+    if use_url_only and url_estimator is not None:
+        feature_names = list(artifact.extra.get("url_features") or PHIUSIIL_URL_FEATURES)
+        scorer = url_estimator
+        warn = float(artifact.extra.get("url_threshold", artifact.threshold))
+        block = float(artifact.extra.get("url_fpr_threshold", max(warn, 0.85)))
+        model_label = f"{artifact.model_name} (URL-only)"
+        metrics = artifact.extra.get("url_metrics") or artifact.metrics
+    else:
+        feature_names = list(artifact.feature_names)
+        scorer = estimator
+        warn = float(artifact.threshold)
+        block = float(artifact.extra.get("fpr_threshold", max(warn, 0.85)))
+        model_label = artifact.model_name
+        metrics = artifact.metrics
+
+    X = features[feature_names].to_frame().T
+    probability = float(scorer.predict_proba(X)[:, 1][0])
+    risk = _risk(probability, warn, block)
     verdict = probe.status if withheld else risk
     warning_map = _warning_by_feature(warnings)
 
@@ -276,33 +366,48 @@ def scan(url: str, timeout: int = 8) -> dict[str, Any]:
     try:
         from phishing.explain import shap_values
 
-        _, values = shap_values(estimator, X, background=X)
-        signals = _signals(artifact.feature_names, values[0], features, warning_map)
+        _, values = shap_values(scorer, X, background=X)
+        signals = _signals(feature_names, values[0], features, warning_map)
     except Exception as exc:  # noqa: BLE001
         signals = []
         shap_error = f"SHAP unavailable: {exc}"
     else:
         shap_error = None
 
-    metrics = artifact.metrics
     notes = _notes(warnings)
     if shap_error:
         notes.insert(0, shap_error)
+    if use_url_only:
+        if probe.status == "fetch_failed":
+            fetch_note = (
+                "The page could not be fetched. This score is from the URL string only."
+            )
+            if normalised.lower().startswith("http://"):
+                fetch_note += (
+                    " This dataset has no legitimate HTTP pages, so plain HTTP "
+                    "scores as phishing."
+                )
+            notes.insert(0, fetch_note)
+        else:
+            notes.insert(
+                0,
+                "Page HTML was not measured; this probability comes from the URL-only model.",
+            )
 
-    return {
+    payload_out = {
         "url": normalised,
         "final_url": normalised,
         "reachability": probe.to_dict(),
         "risk": None if withheld else risk,
         "verdict": verdict,
-        "url_only": withheld,
+        "url_only": use_url_only,
         "probability": probability,
         "rationale": _rationale(verdict, signals, probe),
         "notes": notes,
         "error": None,
         "signals": signals,
-        "coverage": _coverage(probe, len(artifact.feature_names)),
-        "model": artifact.model_name,
+        "coverage": _coverage(probe, len(feature_names)),
+        "model": model_label,
         "model_quality": {
             "accuracy": float(metrics.get("accuracy", 0.0)),
             "auroc": float(metrics.get("auroc", 0.0)),
@@ -318,6 +423,7 @@ def scan(url: str, timeout: int = 8) -> dict[str, Any]:
         "warnings": [w.to_dict() for w in warnings],
         "features": features.to_dict(),
     }
+    return _clean_json(payload_out)
 
 
 def research_findings() -> dict[str, Any]:

@@ -99,6 +99,7 @@ def persist_model(
     model_name: str,
     notes: str = "",
     extra: dict[str, Any] | None = None,
+    extra_estimators: dict[str, Any] | None = None,
     path: Path | None = None,
 ) -> Path:
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -112,13 +113,20 @@ def persist_model(
         notes=notes,
         extra=extra or {},
     )
-    joblib.dump({"estimator": estimator, "artifact": artifact}, path)
+    payload: dict[str, Any] = {"estimator": estimator, "artifact": artifact}
+    if extra_estimators:
+        payload.update(extra_estimators)
+    joblib.dump(payload, path)
     return path
 
 
-def load_model(path: Path | None = None) -> tuple[Any, ModelArtifact]:
+def load_payload(path: Path | None = None) -> dict[str, Any]:
     path = path or (ARTIFACTS_DIR / "model.joblib")
-    payload = joblib.load(path)
+    return joblib.load(path)
+
+
+def load_model(path: Path | None = None) -> tuple[Any, ModelArtifact]:
+    payload = load_payload(path)
     return payload["estimator"], payload["artifact"]
 
 

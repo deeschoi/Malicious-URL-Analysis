@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="Phishing URL Scanner",
-    description="Explained phishing verdicts from a model trained on the UCI "
-                "Phishing Websites dataset.",
+    description="Explained phishing verdicts from a model trained on the "
+                "PhiUSIIL 2023 URL dataset.",
     version="1.0.0",
     lifespan=lifespan,
 )

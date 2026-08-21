@@ -1,4 +1,4 @@
-"""Assemble a 30-feature vector from a raw URL, with per-feature fallbacks."""
+"""Assemble a feature vector from a raw URL, with per-feature fallbacks."""
 
 from __future__ import annotations
 
@@ -8,6 +8,11 @@ import pandas as pd
 
 from phishing.config import (
     FEATURE_COLUMNS,
+    PHIUSIIL_HTML_FEATURES,
+    PHIUSIIL_MINIFIED_LINE_CHARS,
+    PHIUSIIL_MODEL_FEATURES,
+    PHIUSIIL_SPA_LINK_FEATURES,
+    PHIUSIIL_URL_FEATURES,
     TIER_A,
     TIER_B,
     TIER_C,
@@ -15,6 +20,8 @@ from phishing.config import (
 from phishing.features.content_features import extract_content_features, redirect_feature
 from phishing.features.fetch import FetchResult, fetch_page
 from phishing.features.infra_features import extract_infra_features, unavailable_features
+from phishing.features.phiusiil_content import extract_phiusiil_content_features
+from phishing.features.phiusiil_url import extract_phiusiil_url_features
 from phishing.features.reachability import LiveProbe, assess_reachability
 from phishing.features.url_features import extract_url_features
 from phishing.schema import FeatureWarning
@@ -24,12 +31,61 @@ Tier = Literal["A", "B", "full"]
 
 def _neutral_fill(
     missing: list[str], reason: str, warnings: list[FeatureWarning]
-) -> dict[str, int]:
+) -> dict[str, float]:
     values = {}
     for name in missing:
         values[name] = 0
         warnings.append(FeatureWarning(name, reason, 0))
     return values
+
+
+def _looks_like_js_shell(values: dict[str, float]) -> bool:
+    """True when markup is script-heavy but almost has no crawlable links."""
+    links = float(values.get("NoOfExternalRef", 0)) + float(values.get("NoOfSelfRef", 0))
+    scripts = float(values.get("NoOfJS", 0))
+    loc = float(values.get("LineOfCode", 0))
+    return links < 10 and (scripts >= 5 or loc >= 40)
+
+
+def _impute_js_shell_links(
+    values: dict[str, float],
+    fill: dict[str, float],
+    warnings: list[FeatureWarning],
+) -> None:
+    if not fill or not _looks_like_js_shell(values):
+        return
+    for name in PHIUSIIL_SPA_LINK_FEATURES:
+        if name not in fill:
+            continue
+        values[name] = float(fill[name])
+        warnings.append(
+            FeatureWarning(
+                name,
+                "JavaScript shell: static page-structure counts are unmeasured; "
+                "filled with the legitimate-class median",
+                float(fill[name]),
+            )
+        )
+
+
+def _impute_minified_line_length(
+    values: dict[str, float],
+    fill: dict[str, float],
+    warnings: list[FeatureWarning],
+) -> None:
+    if "LargestLineLength" not in fill:
+        return
+    if float(values.get("LargestLineLength", 0)) < PHIUSIIL_MINIFIED_LINE_CHARS:
+        return
+    values["LargestLineLength"] = float(fill["LargestLineLength"])
+    warnings.append(
+        FeatureWarning(
+            "LargestLineLength",
+            "Minified HTML: longest-line length is unmeasured against the "
+            "pretty-printed training pages; filled with the legitimate-class median",
+            float(fill["LargestLineLength"]),
+        )
+    )
 
 
 def url_to_features(
@@ -47,8 +103,7 @@ def url_to_features(
 
     The third return value is whether the host was actually observed. The
     model still scores placeholder features; callers must not treat that
-    score as a live-site verdict when the probe is ``unreachable`` or
-    ``fetch_failed``.
+    score as a live-site verdict when the probe is ``unreachable``.
     """
     warnings: list[FeatureWarning] = []
     values: dict[str, int] = {c: 0 for c in FEATURE_COLUMNS}
@@ -132,4 +187,80 @@ def url_to_features(
         tls_inspected=tls_inspected,
     )
     series = pd.Series({c: int(values[c]) for c in FEATURE_COLUMNS}, dtype="int64")
+    return series, warnings, probe
+
+
+def url_to_phiusiil_features(
+    url: str,
+    tier: Tier = "full",
+    fetch: FetchResult | None = None,
+    timeout: int | None = None,
+    tld_prob: dict[str, float] | None = None,
+    html_fill: dict[str, float] | None = None,
+) -> tuple[pd.Series, list[FeatureWarning], LiveProbe]:
+    """Extract the 48-feature PhiUSIIL vector the served model was trained on.
+
+    ``tier='A'`` is URL parsing only. ``tier='B'`` and ``tier='full'`` fetch HTML.
+    There is no TLS/WHOIS pass: HTTPS is the scheme bit, and page-quality
+    features replace the retired reputation APIs.
+
+    HTML that was not measured is filled with legitimate-class medians from
+    training (not zeros). The scanner must still score those rows with the
+    URL-only model; zeros here would be the phishing prototype.
+    """
+    warnings: list[FeatureWarning] = []
+    values: dict[str, float] = {c: 0.0 for c in PHIUSIIL_MODEL_FEATURES}
+    fill = {name: float((html_fill or {}).get(name, 0.0)) for name in PHIUSIIL_HTML_FEATURES}
+
+    try:
+        values.update(extract_phiusiil_url_features(url, tld_prob=tld_prob))
+    except Exception as exc:  # noqa: BLE001
+        values.update(_neutral_fill(PHIUSIIL_URL_FEATURES, f"URL parse failed: {exc}", warnings))
+
+    probed = False
+    page_fetched = False
+    tls_inspected = False
+    dns_ok: bool | None = None
+
+    def _fill_html(reason: str) -> None:
+        for name in PHIUSIIL_HTML_FEATURES:
+            values[name] = fill[name]
+            warnings.append(FeatureWarning(name, reason, fill[name]))
+
+    if tier in ("B", "full"):
+        probed = True
+        if fetch is not None:
+            result = fetch
+        elif timeout is not None:
+            result = fetch_page(url, timeout=timeout)
+        else:
+            result = fetch_page(url)
+        page_url = result.final_url or url
+        if result.ok and result.soup is not None:
+            page_fetched = True
+            dns_ok = True
+            tls_inspected = page_url.lower().startswith("https://")
+            try:
+                values.update(extract_phiusiil_content_features(result, page_url))
+                fill_src = html_fill or {}
+                _impute_js_shell_links(values, fill_src, warnings)
+                _impute_minified_line_length(values, fill_src, warnings)
+            except Exception as exc:  # noqa: BLE001
+                _fill_html(f"content parse failed: {exc}")
+        else:
+            if result.error_kind == "dns":
+                dns_ok = False
+            elif result.error_kind is not None:
+                dns_ok = True
+            _fill_html(f"page fetch failed: {result.error or 'no HTML'}")
+    else:
+        _fill_html("skipped (tier A)")
+
+    probe = assess_reachability(
+        probed=probed,
+        dns_ok=dns_ok,
+        page_fetched=page_fetched,
+        tls_inspected=tls_inspected,
+    )
+    series = pd.Series({c: float(values[c]) for c in PHIUSIIL_MODEL_FEATURES}, dtype="float64")
     return series, warnings, probe

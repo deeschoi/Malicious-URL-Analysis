@@ -61,7 +61,7 @@ def top_contributors(
             {
                 "feature": name,
                 "shap": value,
-                "encoded_value": int(feature_row[name]),
+                "encoded_value": float(feature_row[name]),
                 "direction": "phishing" if value > 0 else "legitimate",
             }
         )

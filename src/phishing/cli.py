@@ -12,35 +12,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
 
 import pandas as pd
 
-from phishing.config import (
-    ARTIFACTS_DIR,
-    DEPLOYABLE_FEATURES,
-    REPORTS_DIR,
-    RISK_BANDS,
-    ensure_dirs,
-)
-from phishing.data import grouped_split, load_xy
-from phishing.decay import adversarial_curve, decay_simulation, tier_ablation
-from phishing.evaluate import (
-    best_f1_threshold,
-    fpr_target_threshold,
-    leakage_delta_table,
-    metric_dict,
-    threshold_report,
-)
-from phishing.models import ALL_MODELS, NOTEBOOK_MODELS, build_model
-from phishing.tuning import persist_model
-
-
-def _risk_band(probability: float) -> str:
-    for lo, hi, name in RISK_BANDS:
-        if lo <= probability < hi:
-            return name
-    return "critical"
+from phishing.config import REPORTS_DIR, ensure_dirs
+from phishing.data import load_xy
+from phishing.evaluate import leakage_delta_table
+from phishing.models import ALL_MODELS, NOTEBOOK_MODELS
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
@@ -57,152 +35,42 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
 
 
 def cmd_train(args: argparse.Namespace) -> int:
-    """Train the 25-feature deployable model and persist it."""
-    ensure_dirs()
-    X, y, groups = load_xy()
-    X = X[DEPLOYABLE_FEATURES]
-    X_tr, X_te, y_tr, y_te, g_tr, g_te = grouped_split(X, y, groups)
+    """Train the PhiUSIIL scanner model and persist it."""
+    from phishing.fit import train_phiusiil_model
 
-    candidates = NOTEBOOK_MODELS if args.quick else ALL_MODELS
-    rows = []
-    fitted = {}
-    for name in candidates:
-        est = build_model(name)
-        est.fit(X_tr, y_tr)
-        proba = est.predict_proba(X_te)[:, 1]
-        pred = (proba >= 0.5).astype(int)
-        metrics = metric_dict(y_te, pred, proba)
-        metrics["model"] = name
-        rows.append(metrics)
-        fitted[name] = (est, proba)
-        print(f"{name:22s}  acc={metrics['accuracy']:.4f}  "
-              f"auroc={metrics['auroc']:.4f}  f1={metrics['f1']:.4f}")
-
-    comparison = pd.DataFrame(rows).set_index("model")
-    comparison.to_csv(REPORTS_DIR / "deployable_holdout.csv")
-    winner = comparison["auroc"].idxmax()
-    estimator, proba = fitted[winner]
+    print("Training PhiUSIIL model (host-grouped holdout)...")
+    card = train_phiusiil_model()
+    metrics = card["metrics"]
+    print(
+        f"held-out acc={metrics['accuracy']:.4f}  "
+        f"auroc={metrics['auroc']:.4f}  f1={metrics['f1']:.4f}  "
+        f"brier={metrics['brier']:.4f}"
+    )
+    for name, report in card["thresholds"].items():
+        print(
+            f"  {name:5s} threshold {report['threshold']:.3f}  "
+            f"recall={report['recall']:.3f}  fpr={report['fpr']:.3f}"
+        )
+    print(f"Saved {card['artifact']}")
     if args.tune:
-        from phishing.tuning import grouped_random_search
-
-        print(f"Tuning {winner} under grouped CV...")
-        search = grouped_random_search(winner, X_tr, y_tr, g_tr, n_iter=8)
-        estimator = search.best_estimator_
-        print(f"  best_params={search.best_params_}")
-        estimator.fit(X_tr, y_tr)
-        proba = estimator.predict_proba(X_te)[:, 1]
-
-    from phishing.evaluate import calibrate
-
-    print("Calibrating probabilities (isotonic)...")
-    estimator = calibrate(estimator, X_tr, y_tr, method="isotonic", cv=3)
-    proba = estimator.predict_proba(X_te)[:, 1]
-    f1_thr, f1_val = best_f1_threshold(y_te, proba)
-    fpr_thr, fpr_val = fpr_target_threshold(y_te, proba, max_fpr=0.01)
-    f1_report = threshold_report(y_te, proba, f1_thr)
-    print(f"\nWinner by AUROC: {winner}")
-    print(f"  max-F1 threshold={f1_thr:.3f}  F1={f1_val:.4f}  acc={f1_report['accuracy']:.4f}")
-    print(f"  1%-FPR threshold={fpr_thr:.3f}  achieved FPR={fpr_val:.4f}")
-    print(f"  Brier={f1_report['brier']:.4f}")
-
-    path = persist_model(
-        estimator,
-        feature_names=DEPLOYABLE_FEATURES,
-        threshold=f1_thr,
-        metrics=f1_report,
-        model_name=winner,
-        notes=(
-            "25-feature deployable model (excludes Alexa/PageRank/Google Index/"
-            "backlinks/2012 statistical reports). Trained on grouped holdout."
-        ),
-        extra={
-            "fpr_threshold": fpr_thr,
-            "grouped_holdout": comparison.loc[winner].to_dict(),
-        },
-        path=ARTIFACTS_DIR / "model.joblib",
-    )
-    print(f"Saved {path}")
-
-    # Stage 2 reports from the same split, using the winner's algorithm on all 30.
-    X_all, y_all, groups_all = load_xy()
-    Xa_tr, Xa_te, ya_tr, ya_te, _, _ = grouped_split(X_all, y_all, groups_all)
-    rf = build_model("Random Forest")
-    tiers = tier_ablation(Xa_tr, ya_tr, Xa_te, ya_te, model_name="Random Forest")
-    tiers.to_csv(REPORTS_DIR / "tier_ablation.csv")
-    decay = decay_simulation(rf, Xa_tr, ya_tr, Xa_te, ya_te)
-    decay.to_csv(REPORTS_DIR / "decay_simulation.csv")
-    adv = adversarial_curve(rf, Xa_tr, ya_tr, Xa_te, ya_te, max_k=10)
-    adv.to_csv(REPORTS_DIR / "adversarial_curve.csv")
-    print("Wrote tier_ablation.csv, decay_simulation.csv, adversarial_curve.csv")
-
-    from phishing.mining import (
-        cluster_phishing,
-        cluster_rule_crosstab,
-        mine_rules,
-        surrogate_tree,
-    )
-
-    print("Mining association rules and phishing clusters...")
-    rules = mine_rules(Xa_tr, ya_tr)
-    rules.to_csv(REPORTS_DIR / "association_rules.csv", index=False)
-    labels, centroids = cluster_phishing(Xa_tr, ya_tr, n_clusters=3)
-    centroids.to_csv(REPORTS_DIR / "phishing_clusters.csv")
-    if not rules.empty:
-        xtab = cluster_rule_crosstab(Xa_tr, labels, rules)
-        xtab.to_csv(REPORTS_DIR / "cluster_rule_crosstab.csv", index=False)
-    rf.fit(Xa_tr, ya_tr)
-    y_hat = rf.predict(Xa_tr)
-    _, tree_text = surrogate_tree(Xa_tr, y_hat, max_depth=3)
-    (REPORTS_DIR / "surrogate_tree.txt").write_text(tree_text)
-    print("Wrote association_rules.csv, phishing_clusters.csv, surrogate_tree.txt")
+        print("Note: --tune is ignored; the served model uses the default XGBoost.")
+    if args.quick:
+        print("Note: --quick is ignored; PhiUSIIL training always uses XGBoost.")
     return 0
 
 
 def cmd_scan(args: argparse.Namespace) -> int:
-    from phishing.features.extractor import url_to_features
-    from phishing.tuning import load_model
+    from phishing.scanner import UnsafeTargetError, scan
 
-    model_path = Path(args.model) if args.model else ARTIFACTS_DIR / "model.joblib"
-    if not model_path.exists():
-        print(
-            f"No trained model at {model_path}. Run: PYTHONPATH=src python -m phishing.cli train",
-            file=sys.stderr,
-        )
-        return 1
-
-    estimator, artifact = load_model(model_path)
-    features, warnings, probe = url_to_features(args.url, tier=args.tier)
-    X = features[artifact.feature_names].to_frame().T
-    proba = float(estimator.predict_proba(X)[:, 1][0])
-    band = _risk_band(proba)
-    withheld = probe.status in {"unreachable", "fetch_failed"}
-    pred = None if withheld else int(proba >= artifact.threshold)
-
-    reasons = []
     try:
-        from phishing.explain import shap_values, top_contributors
-
-        _, values = shap_values(estimator, X, background=X)
-        reasons = top_contributors(artifact.feature_names, values[0], features, k=5)
-    except Exception as exc:  # noqa: BLE001
-        reasons = [{"error": f"SHAP unavailable: {exc}"}]
-
-    payload = {
-        "url": args.url,
-        "probability": round(proba, 4),
-        "band": band,
-        "reachability": probe.to_dict(),
-        "risk": None if withheld else ("phishing" if pred else "legitimate"),
-        "prediction": None if withheld else ("phishing" if pred else "legitimate"),
-        "url_only": withheld,
-        "threshold": artifact.threshold,
-        "model": artifact.model_name,
-        "tier": args.tier,
-        "reasons": reasons,
-        "warnings": [w.to_dict() for w in warnings],
-        "features": features.to_dict(),
-    }
-    print(json.dumps(payload, indent=2))
+        payload = scan(args.url, tier=args.tier)
+    except UnsafeTargetError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    except (ValueError, FileNotFoundError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(payload, indent=2, default=str))
     return 0
 
 
@@ -286,7 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--quick", action="store_true", help="notebook's three models only")
     ev.set_defaults(func=cmd_evaluate)
 
-    tr = sub.add_parser("train", help="train and persist the 25-feature model")
+    tr = sub.add_parser("train", help="train and persist the PhiUSIIL scanner model")
     tr.add_argument("--quick", action="store_true", help="skip XGBoost/LightGBM")
     tr.add_argument("--tune", action="store_true", help="RandomizedSearchCV on the winner")
     tr.set_defaults(func=cmd_train)

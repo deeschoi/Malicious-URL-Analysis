@@ -10,11 +10,11 @@ from bs4 import BeautifulSoup
 from phishing.features.reachability import classify_network_error
 
 USER_AGENT = (
-    "MaliciousURLAnalysis/0.1 (+research; contact: local) "
-    "Mozilla/5.0 (compatible; phishing-feature-extractor)"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 )
 DEFAULT_TIMEOUT = 8
-MAX_BYTES = 512_000
+MAX_BYTES = 2_000_000
 MAX_REDIRECTS = 8
 
 

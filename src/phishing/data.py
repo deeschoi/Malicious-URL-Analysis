@@ -165,3 +165,74 @@ def load_xy(path: Path | None = None) -> tuple[pd.DataFrame, pd.Series, np.ndarr
     y = model[TARGET_COLUMN]
     groups = pattern_group_ids(X)
     return X, y, groups
+
+
+def _phiusiil_host(url: str) -> str:
+    from urllib.parse import urlparse
+
+    host = urlparse(str(url)).hostname or ""
+    return host.lower().rstrip(".")
+
+
+def load_phiusiil_raw(path: Path | None = None) -> pd.DataFrame:
+    """Load the PhiUSIIL CSV. Label is still 1 = legitimate, 0 = phishing."""
+    from phishing.config import PHIUSIIL_PATH
+
+    csv_path = Path(path) if path is not None else PHIUSIIL_PATH
+    if not csv_path.is_file():
+        raise FileNotFoundError(
+            f"PhiUSIIL dataset not found at {csv_path}. "
+            "Place PhiUSIIL_Phishing_URL_Dataset.csv under datasets/."
+        )
+    df = pd.read_csv(csv_path, low_memory=False)
+    if "label" not in df.columns or "URL" not in df.columns:
+        raise ValueError("PhiUSIIL CSV must contain URL and label columns")
+    return df
+
+
+def load_phiusiil_xy(
+    path: Path | None = None,
+) -> tuple[pd.DataFrame, pd.Series, np.ndarray, dict[str, float]]:
+    """PhiUSIIL features for the served model.
+
+    HTML columns come from the CSV (frozen page snapshots). URL columns are
+    recomputed with the live extractor so training and scanning share one
+    definition — in particular, a leading ``www.`` is not treated as a
+    phishing-like extra subdomain or an extra special character (every
+    legitimate PhiUSIIL row has www and none has a path). URL length, letters,
+    and other-special counts are taken from the www-stripped origin so a
+    trailing slash or ``/en-us`` cannot impersonate the phishing class.
+
+    Recodes the target so 1 = phishing. Groups by hostname.
+    """
+    from phishing.config import (
+        PHIUSIIL_HTML_FEATURES,
+        PHIUSIIL_MODEL_FEATURES,
+        PHIUSIIL_URL_FEATURES,
+    )
+    from phishing.features.phiusiil_url import extract_phiusiil_url_features
+
+    raw = load_phiusiil_raw(path)
+    missing_html = [c for c in PHIUSIIL_HTML_FEATURES if c not in raw.columns]
+    if missing_html:
+        raise ValueError(f"PhiUSIIL dataset is missing expected columns: {missing_html}")
+
+    tld_prob = (
+        raw.groupby("TLD")["TLDLegitimateProb"].first().astype(float).to_dict()
+        if "TLD" in raw.columns
+        else {}
+    )
+    tld_prob = {str(k): float(v) for k, v in tld_prob.items()}
+
+    y = (raw["label"] == 0).astype(int)
+    y.name = TARGET_COLUMN
+
+    url_rows = [
+        extract_phiusiil_url_features(url, tld_prob=tld_prob) for url in raw["URL"].tolist()
+    ]
+    url_df = pd.DataFrame(url_rows, index=raw.index)[PHIUSIIL_URL_FEATURES]
+    html_df = raw[PHIUSIIL_HTML_FEATURES].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+    X = pd.concat([url_df, html_df], axis=1)[PHIUSIIL_MODEL_FEATURES]
+    groups = raw["URL"].map(_phiusiil_host).fillna("").to_numpy()
+    codes, _ = pd.factorize(pd.Series(groups), sort=True)
+    return X, y, codes.astype(np.int64), tld_prob

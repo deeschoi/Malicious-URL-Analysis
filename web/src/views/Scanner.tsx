@@ -39,7 +39,7 @@ export function Scanner() {
     setBusy(true);
     setResult(null);
     setError(false);
-    setStatus("Fetching the page, inspecting its certificate and parsing its HTML…");
+        setStatus("Fetching the page and parsing its HTML…");
     try {
       const payload = await scanUrl(trimmed);
       setResult(payload);

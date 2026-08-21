@@ -24,6 +24,7 @@ PACKAGE_MODULES = [
     "phishing.decay",
     "phishing.evaluate",
     "phishing.explain",
+    "phishing.fit",
     "phishing.io",
     "phishing.mining",
     "phishing.models",

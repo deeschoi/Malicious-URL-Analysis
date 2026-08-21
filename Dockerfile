@@ -21,7 +21,8 @@ RUN python -m venv "$VIRTUAL_ENV"
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY pyproject.toml README.md Training_Dataset.csv ./
+COPY pyproject.toml README.md ./
+COPY datasets/ ./datasets/
 COPY src/ ./src/
 COPY analysis/ ./analysis/
 RUN pip install . --no-deps
@@ -57,7 +58,7 @@ RUN apt-get update \
 
 COPY --from=builder /opt/venv /opt/venv
 
-COPY Training_Dataset.csv ./
+COPY datasets/ ./datasets/
 COPY api/ ./api/
 COPY reports/ ./reports/
 COPY --from=builder /build/artifacts/ ./artifacts/

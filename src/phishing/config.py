@@ -13,11 +13,24 @@ def _path_from_env(name: str, default: Path) -> Path:
     return Path(value).expanduser().resolve() if value else default
 
 
+def _first_existing(*candidates: Path) -> Path:
+    for path in candidates:
+        if path.is_file():
+            return path
+    return candidates[0]
+
+
 # Defaults assume an editable checkout (src/phishing/config.py -> parents[2]).
 # When the package is pip-installed elsewhere — in a container, for instance —
 # that inference is wrong, so every path can be overridden by environment.
 PROJECT_ROOT = _path_from_env("PHISHING_ROOT", Path(__file__).resolve().parents[2])
-DATA_PATH = _path_from_env("PHISHING_DATA", PROJECT_ROOT / "Training_Dataset.csv")
+DATA_PATH = _path_from_env(
+    "PHISHING_DATA",
+    _first_existing(
+        PROJECT_ROOT / "Training_Dataset.csv",
+        PROJECT_ROOT / "datasets" / "Training_Dataset.csv",
+    ),
+)
 ARTIFACTS_DIR = _path_from_env("PHISHING_ARTIFACTS_DIR", PROJECT_ROOT / "artifacts")
 REPORTS_DIR = _path_from_env("PHISHING_REPORTS_DIR", PROJECT_ROOT / "reports")
 FIGURES_DIR = REPORTS_DIR / "figures"
@@ -278,3 +291,180 @@ FEATURE_INFO = {
     }
     for feature in FEATURE_COLUMNS
 }
+
+# ---------------------------------------------------------------------------
+# PhiUSIIL (Prasad & Chandra, 2023/24) — the served scanner model
+# ---------------------------------------------------------------------------
+# Raw URL + HTML table. Label in the CSV is 1 = legitimate, 0 = phishing;
+# loaders invert that to match this package (1 = phishing).
+PHIUSIIL_PATH = _path_from_env(
+    "PHISHING_PHIUSIIL", PROJECT_ROOT / "datasets" / "PhiUSIIL_Phishing_URL_Dataset.csv"
+)
+
+# Columns that leak the label or are identifiers, never fed to a model.
+PHIUSIIL_DROP = [
+    "FILENAME",
+    "URL",
+    "Domain",
+    "TLD",
+    "Title",
+    "URLSimilarityIndex",  # 100 for every legitimate row
+    "URLCharProb",  # derived per-URL prior we cannot reproduce at scan time
+]
+
+# URL-string features: no network. IsHTTPS is the scheme bit, not the 2012
+# SSLfinal_State (trusted issuer + cert older than a year).
+PHIUSIIL_URL_FEATURES = [
+    "URLLength",
+    "DomainLength",
+    "IsDomainIP",
+    "TLDLength",
+    "NoOfSubDomain",
+    "HasObfuscation",
+    "NoOfObfuscatedChar",
+    "ObfuscationRatio",
+    "NoOfLettersInURL",
+    "LetterRatioInURL",
+    "NoOfDegitsInURL",
+    "DegitRatioInURL",
+    "NoOfEqualsInURL",
+    "NoOfQMarkInURL",
+    "NoOfAmpersandInURL",
+    "NoOfOtherSpecialCharsInURL",
+    "SpacialCharRatioInURL",
+    "IsHTTPS",
+    "CharContinuationRate",
+    "TLDLegitimateProb",
+]
+
+# Page-source features. These replace Alexa / PageRank / inbound-link counts:
+# social links, copyright, JS/CSS/image volume, and title↔domain match are
+# living proxies for "does this look like an established site?"
+PHIUSIIL_HTML_FEATURES = [
+    "LineOfCode",
+    "LargestLineLength",
+    "HasTitle",
+    "DomainTitleMatchScore",
+    "URLTitleMatchScore",
+    "HasFavicon",
+    "Robots",
+    "IsResponsive",
+    "NoOfURLRedirect",
+    "NoOfSelfRedirect",
+    "HasDescription",
+    "NoOfPopup",
+    "NoOfiFrame",
+    "HasExternalFormSubmit",
+    "HasSocialNet",
+    "HasSubmitButton",
+    "HasHiddenFields",
+    "HasPasswordField",
+    "Bank",
+    "Pay",
+    "Crypto",
+    "HasCopyrightInfo",
+    "NoOfImage",
+    "NoOfCSS",
+    "NoOfJS",
+    "NoOfSelfRef",
+    "NoOfEmptyRef",
+    "NoOfExternalRef",
+]
+
+# Static markup on JS-rendered sites. PhiUSIIL crawled complete homepages;
+# GitHub / Visa / Ramp shells have almost no anchors and little HTML, which
+# the model reads as a phishing kit. At scan time these are imputed when the
+# page looks like a shell.
+PHIUSIIL_SPA_LINK_FEATURES = [
+    "NoOfExternalRef",
+    "NoOfSelfRef",
+    "NoOfEmptyRef",
+    "LineOfCode",
+]
+
+# PhiUSIIL homepages were pretty-printed (legit 90th percentile ≈ 16k chars).
+# Live minified HTML is often one 100k–1M character line, which overlaps the
+# phishing-obfuscation tail. Scan-time values above this are treated as
+# unmeasured and filled with the legitimate-class median.
+PHIUSIIL_MINIFIED_LINE_CHARS = 20_000
+
+PHIUSIIL_MODEL_FEATURES = PHIUSIIL_URL_FEATURES + PHIUSIIL_HTML_FEATURES
+
+PHIUSIIL_FEATURE_LABELS = {
+    "URLLength": "URL length",
+    "DomainLength": "Hostname length",
+    "IsDomainIP": "Hostname is a raw IP",
+    "TLDLength": "TLD length",
+    "NoOfSubDomain": "Subdomain depth",
+    "HasObfuscation": "Percent-encoded characters",
+    "NoOfObfuscatedChar": "Percent-encoded character count",
+    "ObfuscationRatio": "Percent-encoding ratio",
+    "NoOfLettersInURL": "Letters in the URL",
+    "LetterRatioInURL": "Letter ratio",
+    "NoOfDegitsInURL": "Digits in the URL",
+    "DegitRatioInURL": "Digit ratio",
+    "NoOfEqualsInURL": "Equals signs in the URL",
+    "NoOfQMarkInURL": "Question marks in the URL",
+    "NoOfAmpersandInURL": "Ampersands in the URL",
+    "NoOfOtherSpecialCharsInURL": "Other special characters",
+    "SpacialCharRatioInURL": "Special-character ratio",
+    "IsHTTPS": "Uses HTTPS",
+    "CharContinuationRate": "Uninterrupted character runs in the domain",
+    "TLDLegitimateProb": "How common this TLD is among legitimate sites",
+    "LineOfCode": "HTML line count",
+    "LargestLineLength": "Longest HTML line",
+    "HasTitle": "Has a title",
+    "DomainTitleMatchScore": "Domain appears in the title",
+    "URLTitleMatchScore": "URL appears in the title",
+    "HasFavicon": "Has a favicon",
+    "Robots": "Robots directives present",
+    "IsResponsive": "Responsive viewport tag",
+    "NoOfURLRedirect": "Redirect count",
+    "NoOfSelfRedirect": "Same-site redirects",
+    "HasDescription": "Has a description meta tag",
+    "NoOfPopup": "Popup scripts",
+    "NoOfiFrame": "Iframe count",
+    "HasExternalFormSubmit": "Form posts off-domain",
+    "HasSocialNet": "Social-network links",
+    "HasSubmitButton": "Submit button",
+    "HasHiddenFields": "Hidden form fields",
+    "HasPasswordField": "Password field",
+    "Bank": "Banking keywords",
+    "Pay": "Payment keywords",
+    "Crypto": "Crypto keywords",
+    "HasCopyrightInfo": "Copyright notice",
+    "NoOfImage": "Image count",
+    "NoOfCSS": "Stylesheet count",
+    "NoOfJS": "Script count",
+    "NoOfSelfRef": "On-domain links",
+    "NoOfEmptyRef": "Empty or javascript links",
+    "NoOfExternalRef": "Off-domain links",
+}
+
+FEATURE_LABELS.update(PHIUSIIL_FEATURE_LABELS)
+
+VALUE_MEANING.update(
+    {
+        "IsDomainIP": {0: "Hostname is a domain", 1: "Hostname is a raw IP"},
+        "HasObfuscation": {0: "No percent-encoding", 1: "URL contains percent-encoding"},
+        "IsHTTPS": {0: "HTTP (no TLS)", 1: "HTTPS"},
+        "HasTitle": {0: "No title", 1: "Has a title"},
+        "HasFavicon": {0: "No favicon", 1: "Has a favicon"},
+        "Robots": {0: "No robots directives", 1: "Robots directives present"},
+        "IsResponsive": {0: "No viewport tag", 1: "Responsive viewport tag"},
+        "HasDescription": {0: "No description meta tag", 1: "Has a description"},
+        "HasExternalFormSubmit": {0: "Forms stay on-domain", 1: "A form posts off-domain"},
+        "HasSocialNet": {0: "No social-network links", 1: "Links out to social networks"},
+        "HasSubmitButton": {0: "No submit button", 1: "Has a submit button"},
+        "HasHiddenFields": {0: "No hidden fields", 1: "Has hidden form fields"},
+        "HasPasswordField": {0: "No password field", 1: "Has a password field"},
+        "Bank": {0: "No banking keywords", 1: "Banking keywords present"},
+        "Pay": {0: "No payment keywords", 1: "Payment keywords present"},
+        "Crypto": {0: "No crypto keywords", 1: "Crypto keywords present"},
+        "HasCopyrightInfo": {0: "No copyright notice", 1: "Copyright notice present"},
+    }
+)
+
+assert len(PHIUSIIL_MODEL_FEATURES) == 48
+assert len(set(PHIUSIIL_MODEL_FEATURES)) == 48
+assert set(PHIUSIIL_SPA_LINK_FEATURES) <= set(PHIUSIIL_HTML_FEATURES)
