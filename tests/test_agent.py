@@ -102,6 +102,19 @@ def test_briefing_reports_the_landing_page_separately_from_the_input():
     assert "Page actually scored: <https://phish.example/login>" in text
 
 
+def test_briefing_does_not_treat_a_missing_url_pattern_as_a_clearance():
+    text = briefing(
+        _scan(
+            verdict="unreachable",
+            risk=None,
+            url_only=True,
+            url_pattern_risk=None,
+        )
+    )
+    assert "URL-pattern judgment: none" in text
+    assert "not a safety clearance" in text
+
+
 def test_briefing_survives_a_sparse_payload():
     """The scan payload comes from the client, so it may be anything."""
     assert briefing({}) != ""

@@ -2,14 +2,14 @@
 
 Sphinx is a live phishing scanner. Paste a URL and it fetches the page (JavaScript is never executed), scores the risk with a trained classifier, and shows which signals decided the verdict.
 
-The web app brands itself **Sphinx — URL Phishing Guardian**. Four tabs:
+The web app brands itself **Sphinx — URL Phishing Guardian**. Four sections:
 
-| Tab | What it is for |
+| Section | What it is for |
 |---|---|
-| **Scanner** | Paste a URL. Sphinx returns a verdict, probability, SHAP contributors, and scan coverage — then lets you interrogate that scan in plain English (see [Ask about this scan](#ask-about-this-scan)). |
+| **Scanner** | Paste a URL. Sphinx returns a verdict, probability, SHAP contributors, and scan coverage. When the two estimators disagree, both scores are shown. Unreachable hosts get no live rating. The analyst then splits its answer into **Findings** (measured evidence) and **Commentary** (see [Ask about this scan](#ask-about-this-scan)). |
 | **History** | Recent scans logged by the API. Credentials, query strings, and token-shaped path segments are stripped before storage. |
 | **Stats** | Verdict mix and daily mean score, for spotting drift. Unreachable hosts are excluded from the mean. |
-| **Research findings** | Headline tables from the 2012 UCI analysis that started this project (leakage, encoding, decay). |
+| **Research findings** | Headline tables from the 2012 UCI analysis that started this project (leakage, encoding, decay). Nothing on that page is used to score a URL. |
 
 This repo began as a DATS 2103 coursework project on the 2012 UCI Phishing Websites table. The original submission is unchanged: [`Choi_Final.ipynb`](Choi_Final.ipynb). The scanner Sphinx serves today is trained on a different dataset.
 
@@ -105,11 +105,11 @@ Identifiers and label leaks (`URL`, `Domain`, `Title`, `URLSimilarityIndex`, `UR
 Two estimators are persisted:
 
 1. The **48-feature page model**, used when HTML was actually measured.
-2. A **URL-only fallback**, used when the host is unreachable, the fetch failed, or HTML was not measured. Missing HTML is never scored as zeros.
+2. A **URL-only fallback**, used when HTML was not measured. Missing HTML is never scored as zeros. A failed fetch still gets a live risk band from this estimator. DNS failure (`unreachable`) and an offline `--tier A` scan (`not_probed`) do not: those verdicts withhold `risk`.
 
-A third path is a **disagreement rule**, not a third model. The page model's top weights (`NoOfExternalRef` 57%, `LineOfCode` 10%, `NoOfSelfRef` 9%) are the columns that moved between the 2023 crawl and 2026 markup, so a rich modern homepage can pin at *p* ≈ 1.0. When the page model says kit and the URL string looks clean, the URL score wins. That rule is gated: kits on shared-hosting suffixes (`github.io`, `vercel.app`, `firebaseapp.com`, …) keep the page score, because those URLs look clean by construction.
+A third path is a **disagreement rule**, not a third model. The page model's top weights (`NoOfExternalRef` 57%, `LineOfCode` 10%, `NoOfSelfRef` 9%) are the columns that moved between the 2023 crawl and 2026 markup, so a rich modern homepage can pin at *p* ≈ 1.0. When the page model says kit and the URL string looks clean, the URL score wins. That rule is gated: kits on shared-hosting suffixes (`github.io`, `vercel.app`, `firebaseapp.com`, …) keep the page score, because those URLs look clean by construction. When the two scores disagree, or differ by 0.2 or more, the Scanner shows both rather than hiding the unused estimator.
 
-Unreachable hosts do not get a live risk band. They get a `url_pattern_risk` chip — a judgment about the string, rendered distinctly from a fetched-page verdict.
+Unreachable hosts do not get a live risk band. The UI may show a `url_pattern_risk` chip (`URL pattern: phishing` / `suspicious`) only when the origin string, or a kit-shaped path (`*.html`, `*.php`, …), actually looks like phishing. A clean origin is left unchipped: that is not a safety clearance, and the chip never reuses the live-verdict colours. Kit-shaped paths are a routing hint like the free-hosting suffixes, not a model feature — counting any path in the URL-only model made `/en-us` look like a kit. The origin-only model ignores the path, so a dead host with `/wetj/famt.html` is flagged from that suffix rather than from the host alone.
 
 The response reports the page that was actually scored. A URL that 302s somewhere else shows the landing page and the hop count, because that redirect is often the whole attack.
 
@@ -138,7 +138,7 @@ Held-out sample, seed 7, 120 unique hosts per class (tuning was done on seed 42)
 | False-positive rate | 0.068 | **0.009** |
 | Precision | 0.862 | **0.980** |
 
-Of 240 hosts, 59 no longer resolve (56 of them phishing). That churn, not the model, is the main limit on live recall. Of those 59 unrated hosts, 54 are flagged as phishing-shaped URLs by the string-only chip.
+Of 240 hosts, 59 no longer resolve (56 of them phishing). That churn, not the model, is the main limit on live recall. Of those 59 unrated hosts, the eval dump still records 54 as phishing-shaped on the URL string. The remaining handful used to receive a `legitimate` string chip; current Sphinx withholds that chip, because a clean-looking origin is not evidence that a dead host is safe.
 
 **What was measured and rejected.** Three plausible changes made things worse and were backed out; the reasoning is in the code comments so they are not retried:
 
@@ -150,7 +150,18 @@ A separate leak survives: `TLDLegitimateProb` is 0.013 for `.io` and 0.0015 for 
 
 ## Ask about this scan
 
-Every result carries a chat panel. It is an explanation layer over a scan that already happened — the verdict, the probability, and the SHAP attributions are computed by the classifier before a single token is generated, and the model is told in as many words that its own impression of a URL string is not evidence.
+Every result carries a chat panel. It is an explanation layer over a scan that already happened — the verdict, the probability, and the SHAP attributions are computed by the classifier before a single token is generated, and the model is told in as many words that its own impression of a URL string is not evidence. Changing the URL starts a new conversation, so evidence from one scan cannot leak into the next.
+
+Starter chips on the panel: *Why this verdict?*, *What would change your mind?*, *What could this scan have missed?*, *How much should I trust this score?*
+
+Answers are required to use two headings, in that order:
+
+| Section | What belongs there |
+|---|---|
+| **Findings** | Measured evidence only, as bullets. Optional bold groups such as **Toward phishing** / **Toward legitimate**. Each bullet names the feature, its measured value, and the SHAP direction (log-odds, not a percentage of the verdict). |
+| **Commentary** | One or two short paragraphs that synthesize those findings for this verdict, including limits and what would change the read. No new facts that are not in Findings or a tool result. |
+
+The UI (`web/src/analystReply.ts`) parses those headings into two panels. If the model skips the headings, the parser still splits evidence bullets from surrounding prose so the layout does not collapse into a wall of markdown.
 
 Grounding is enforced by the tool surface rather than by asking nicely. `src/phishing/agent.py` exposes six tools over the real payload:
 
@@ -165,13 +176,14 @@ Grounding is enforced by the tool surface rather than by asking nicely. `src/phi
 
 The UI lists which of these an answer actually consulted, so a claim can be traced to evidence rather than taken on faith.
 
-The system prompt is server-side and non-negotiable. Client messages are filtered to `user` and `assistant` turns before they are sent upstream, so a caller cannot smuggle in a system message or a fabricated tool result. Three things the prompt insists on:
+The system prompt is server-side and non-negotiable. Client messages are filtered to `user` and `assistant` turns before they are sent upstream, so a caller cannot smuggle in a system message or a fabricated tool result. The briefing the analyst sees also refuses to treat a missing `url_pattern_risk` as a clearance. Four things the prompt insists on:
 
 1. **Never clear a site.** A `legitimate` verdict means the model found no phishing signals — not that it is safe to type a password into. On the live sample this model misses about a quarter of the phishing pages it can reach.
 2. **Say which accuracy number applies.** ~99.9% is the frozen-column holdout; ~90.6% accuracy / 75% recall is live re-extraction, which is what a real scan gets.
-3. **Volunteer the known blind spots** — the plain-HTTP prior, the `.io`/`.app` TLD prior, and phishing kits on trusted platforms — when they bear on the answer.
+3. **Lead with withheld / URL-only scans.** A URL-string score is not a judgment of a live site.
+4. **Volunteer the known blind spots** — the plain-HTTP prior, the `.io`/`.app` TLD prior, and phishing kits on trusted platforms — when they bear on the answer.
 
-Asked about `http://neverssl.com`, which the scanner flags at *p* ≈ 1.0, it names `IsHTTPS` and its +10.9 log-odds contribution, then says the flag is more likely a false positive than evidence, because the training table has essentially no legitimate HTTP rows. That is the intended behaviour: the interesting answer is usually why a score should not be trusted.
+Asked about `http://neverssl.com`, which the scanner flags at *p* ≈ 1.0, it names `IsHTTPS` and its +10.9 log-odds contribution under Findings, then says in Commentary that the flag is more likely a false positive than evidence, because the training table has essentially no legitimate HTTP rows. That is the intended behaviour: the interesting answer is usually why a score should not be trusted.
 
 Transport is the OpenAI-compatible Groq endpoint over `requests` — no new dependency. Without `GROQ_API_KEY` the endpoint returns 503 and the panel explains how to enable it.
 
@@ -207,9 +219,9 @@ datasets/
 Choi_Final.ipynb                      original coursework (untouched)
 src/phishing/
   fit.py                              train the PhiUSIIL scanner model
-  scanner.py                          live scan → verdict, SHAP, coverage
+  scanner.py                          live scan → verdict, SHAP, coverage, URL-pattern chip
   netguard.py                         SSRF guards: redirects, rebinding, metadata IPs
-  agent.py                            Groq-backed analyst: grounding + tool loop
+  agent.py                            Groq-backed analyst: Findings / Commentary + tool loop
   settings.py                         env / .env configuration and secrets
   cli.py                              train | scan | evaluate | validate
   data.py                             PhiUSIIL + UCI loaders, grouped splits
@@ -222,7 +234,7 @@ src/phishing/
 analysis/                             01–05: UCI research; 06: train; 07: live eval
 api/main.py                           FastAPI (scan, chat, scans, stats, findings, UI)
 api/security.py                       rate limits, concurrency cap, optional API key
-web/                                  React + Vite + TypeScript (Sphinx UI)
+web/                                  React + Vite + TypeScript (Sphinx UI; Findings / Commentary in analystReply.ts)
 migrations/                           alembic revisions for the scans table
 tests/                                pytest; network tests marked skippable
 notebooks/                            stages 1–3 narrative (2012)
@@ -241,6 +253,7 @@ Dockerfile                            trains the model at build, serves via uvic
 - Grouped holdout is still i.i.d. across hosts, not across time. There is no temporal holdout.
 - The served model is **not calibrated**. Holdout Brier is 0.0004 on frozen columns, but live false positives pin at *p* ≈ 1.0 and platform-hosted kits at *p* ≈ 0. Read the gauge as a score, not as a frequency.
 - Rate limits and the concurrency cap are process-local. Replicating the API needs a shared store (Redis) to hold across instances.
+- Unreachable hosts with a clean origin get no `url_pattern_risk` chip. Absence of a chip is not a legitimate verdict.
 - The analyst explains a scan; it does not add detection. It can only be as right as the scan it is reading, and it is a language model — the tool trail under each answer is there to be checked.
 
 ## References

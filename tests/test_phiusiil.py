@@ -14,6 +14,7 @@ from phishing.features.phiusiil_url import (
     char_continuation_rate,
     extract_phiusiil_url_features,
     is_domain_ip,
+    is_kit_shaped_path,
 )
 
 # ``url_to_phiusiil_features`` fails closed without the trained legitimate-class
@@ -470,6 +471,27 @@ def test_free_hosting_platform_is_not_a_model_input():
     assert "IsFreeHostingPlatform" not in feats
 
 
+def test_kit_shaped_path_is_a_routing_hint_not_a_model_input():
+    """Kit landing files must not go back into URLLength / specials.
+
+    Counting any path re-leaks /en-us into the phishing class. The hint is
+    only for the withheld URL-pattern chip.
+    """
+    assert "IsKitShapedPath" not in PHIUSIIL_URL_FEATURES
+    assert "IsKitShapedPath" not in PHIUSIIL_MODEL_FEATURES
+    assert is_kit_shaped_path("https://healtyworld.mx/wetj/famt.html") is True
+    assert is_kit_shaped_path("https://dkb-kredit-online.example/dkb-banking/login.php") is True
+    assert is_kit_shaped_path("https://inzizi.com/") is False
+    assert is_kit_shaped_path("https://inzizi.com") is False
+    assert is_kit_shaped_path("https://www.visa.com/en-us") is False
+    assert is_kit_shaped_path("https://github.com/python/cpython") is False
+    assert is_kit_shaped_path("https://github.com/") is False
+    feats = extract_phiusiil_url_features("https://healtyworld.mx/wetj/famt.html")
+    origin = extract_phiusiil_url_features("https://healtyworld.mx")
+    assert feats["URLLength"] == origin["URLLength"]
+    assert "IsKitShapedPath" not in feats
+
+
 def test_platform_hosts_still_carry_the_tld_prior_leak():
     """Documents a *separate* leak that removing IsFreeHostingPlatform does not fix.
 
@@ -642,10 +664,61 @@ def test_unreachable_host_reports_a_url_pattern_risk():
     )
     assert result["verdict"] == "unreachable"
     assert result["risk"] is None  # still no live-site rating
-    assert result["url_pattern_risk"] in {
-        "phishing", "suspicious", "probably safe", "legitimate",
-    }
-    assert "URL pattern" in result["rationale"]
+    # Safe-side origin scores are no longer emitted as a chip on withheld scans.
+    assert result["url_pattern_risk"] in {"phishing", "suspicious", None}
+
+
+def _dns_fail(url: str) -> FetchResult:
+    return FetchResult(
+        url=url,
+        final_url=url,
+        ok=False,
+        status_code=None,
+        html=None,
+        soup=None,
+        n_redirects=0,
+        error="name resolution failed",
+        error_kind="dns",
+    )
+
+
+def test_unreachable_kit_path_flags_the_url_pattern_chip():
+    """A dead host with a kit landing file must not read as a clean origin."""
+    from phishing.scanner import scan
+    from phishing.tuning import load_payload
+
+    try:
+        load_payload()
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    url = "https://healtyworld.mx/wetj/famt.html"
+    result = scan(url, tier="B", fetch=_dns_fail(url))
+    assert result["verdict"] == "unreachable"
+    assert result["risk"] is None
+    assert result["url_pattern_risk"] == "phishing"
+    assert any("path looks like a phishing kit" in note for note in result["notes"])
+    assert "looks like phishing" in result["rationale"]
+
+
+def test_unreachable_homepage_does_not_claim_the_string_is_safe():
+    """Empty-page kits leave no URL-string evidence once the host is dead."""
+    from phishing.scanner import scan
+    from phishing.tuning import load_payload
+
+    try:
+        load_payload()
+    except FileNotFoundError:
+        pytest.skip("no trained model")
+
+    url = "https://inzizi.com/"
+    result = scan(url, tier="B", fetch=_dns_fail(url))
+    assert result["verdict"] == "unreachable"
+    assert result["risk"] is None
+    assert result["url_pattern_risk"] is None
+    assert "legitimate" not in result["rationale"].lower()
+    assert "does not look like phishing" not in result["rationale"]
+    assert "not a finding that the site is safe" in result["rationale"]
 
 
 def test_url_only_model_does_not_flag_apex_https_brands():

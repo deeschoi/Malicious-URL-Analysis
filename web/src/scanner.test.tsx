@@ -221,6 +221,44 @@ describe("Scanner", () => {
     expect(screen.getByText(/URL-string score/)).toBeInTheDocument();
   });
 
+  it("does not show a legitimate URL chip for an unreachable clean origin", async () => {
+    stubFetch((url) =>
+      url.includes("/api/agent")
+        ? jsonResponse(AGENT_OFF)
+        : jsonResponse(
+            scanResult({
+              verdict: "unreachable",
+              risk: null,
+              prediction: null,
+              url_only: true,
+              url_pattern_risk: null,
+              probability: 0.06,
+              rationale:
+                "The hostname does not resolve, so this is not a live-site judgment. A clean-looking origin is not a finding that the site is safe.",
+              coverage: {
+                ...scanResult().coverage,
+                reachability: "unreachable",
+                dns_ok: false,
+                page_fetched: false,
+                https: false,
+                tls_checked: false,
+                http_status: null,
+              },
+            }),
+          ),
+    );
+    const user = userEvent.setup();
+    renderScanner();
+
+    await user.type(screen.getByLabelText("URL to scan"), "https://inzizi.com/");
+    await user.click(screen.getByRole("button", { name: "Scan" }));
+
+    const badge = await screen.findByText("unreachable", { selector: ".badge" });
+    expect(badge).toBeInTheDocument();
+    expect(screen.queryByText(/URL pattern:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("legitimate")).not.toBeInTheDocument();
+  });
+
   it("labels an offline scan instead of printing the raw verdict", async () => {
     stubFetch((url) =>
       url.includes("/api/agent")

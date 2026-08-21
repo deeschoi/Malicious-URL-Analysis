@@ -20,7 +20,7 @@ from phishing.config import (
     VALUE_MEANING,
 )
 from phishing.features.extractor import url_to_phiusiil_features
-from phishing.features.phiusiil_url import is_free_hosting_platform
+from phishing.features.phiusiil_url import is_free_hosting_platform, is_kit_shaped_path
 from phishing.features.reachability import LiveProbe
 from phishing.io import load_json, to_jsonable
 from phishing.netguard import (
@@ -238,6 +238,11 @@ def _url_pattern_phrase(url_pattern_risk: str | None) -> str:
         return " The URL pattern itself looks suspicious."
     if url_pattern_risk == "legitimate":
         return " The URL pattern itself does not look like phishing."
+    # Withheld scans with a clean origin: do not call that "not phishing".
+    if url_pattern_risk is None:
+        return (
+            " A clean-looking origin is not a finding that the site is safe."
+        )
     return ""
 
 
@@ -405,6 +410,17 @@ def scan(
         _risk(url_probability, url_warn, url_block) if url_probability is not None else None
     )
 
+    # Withheld scans never get a live risk band. The URL-pattern chip is the
+    # only string judgment the UI shows, so a kit-shaped path (ignored by the
+    # origin-only model) still has to surface, and a clean origin must not be
+    # rendered as "legitimate".
+    kit_path = is_kit_shaped_path(normalised)
+    if withheld:
+        if kit_path:
+            url_pattern_risk = "phishing"
+        elif url_pattern_risk in {"legitimate", "probably safe"}:
+            url_pattern_risk = None
+
     # The page model's top weights (NoOfExternalRef 57%, LineOfCode 10%,
     # NoOfSelfRef 9%) are exactly the columns that moved between the 2023 crawl
     # and 2026 markup, so a rich modern homepage can pin at p ≈ 1.0. When the
@@ -463,6 +479,13 @@ def scan(
             "on its own looks clean. That pattern is usually 2023-vs-2026 drift "
             "in the page-richness features rather than evidence, so the score "
             "shown is the URL-string score.",
+        )
+    if withheld and kit_path:
+        notes.insert(
+            0,
+            "The URL path looks like a phishing kit (a landing file such as "
+            ".html or .php). The origin-only model does not count the path, so "
+            "the string is flagged from that path rather than from the host alone.",
         )
     if use_url_only:
         if probe.status == "fetch_failed":

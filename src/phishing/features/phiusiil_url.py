@@ -83,6 +83,27 @@ def is_free_hosting_platform(url: str) -> int:
     return 1 if platform_suffix(_host(url)) else 0
 
 
+# Landing-file suffixes typical of phishing kits. Locale and app paths
+# (/en-us, /python/cpython) do not match, which is the point: counting any
+# path in the URL-only model re-leaked those into the phishing class.
+_KIT_PATH_SUFFIXES = (".html", ".htm", ".php", ".asp", ".aspx", ".jsp", ".cgi")
+
+
+def is_kit_shaped_path(url: str) -> bool:
+    """True when the path looks like a phishing-kit landing file.
+
+    A scanner routing hint, never a model feature. PhiUSIIL legitimate rows
+    have no paths, so putting path length into the URL-only model made
+    ``/en-us`` look like a kit. File suffixes are precise enough to flag
+    ``/wetj/famt.html`` without touching homepages or locale paths.
+    """
+    path = (_parsed(url).path or "").rstrip("/")
+    if not path:
+        return False
+    last = path.rsplit("/", 1)[-1].lower()
+    return any(last.endswith(suffix) for suffix in _KIT_PATH_SUFFIXES)
+
+
 def _url_for_char_counts(url: str, host: str) -> str:
     """Count letters / length / specials on the www-stripped origin.
 

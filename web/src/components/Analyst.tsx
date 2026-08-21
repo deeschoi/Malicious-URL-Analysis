@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { askAnalyst, fetchAgentStatus } from "../api";
 import type { AgentStatus, ChatMessage, ScanResult, ToolUse } from "../types";
+import { AnalystReply } from "./AnalystReply";
 
 /** Questions worth asking about any scan, phrased so the answer has to cite
  *  measured evidence rather than an opinion about the URL string. */
@@ -23,6 +24,8 @@ const TOOL_LABEL: Record<string, string> = {
 interface Turn extends ChatMessage {
   tools?: ToolUse[];
 }
+
+const MIN_THINKING_MS = 700;
 
 export function Analyst({ result }: { result: ScanResult }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
@@ -67,10 +70,15 @@ export function Analyst({ result }: { result: ScanResult }) {
     setBusy(true);
     setError(null);
     try {
+      const started = Date.now();
       const reply = await askAnalyst(
         result,
         next.map(({ role, content }) => ({ role, content })),
       );
+      const elapsed = Date.now() - started;
+      if (elapsed < MIN_THINKING_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_THINKING_MS - elapsed));
+      }
       setTurns([
         ...next,
         { role: "assistant", content: reply.reply, tools: reply.tools_used },
@@ -123,7 +131,11 @@ export function Analyst({ result }: { result: ScanResult }) {
             <span className="analyst-who">
               {turn.role === "user" ? "You" : "Analyst"}
             </span>
-            <div className="analyst-text">{turn.content}</div>
+            {turn.role === "assistant" ? (
+              <AnalystReply content={turn.content} />
+            ) : (
+              <div className="analyst-text">{turn.content}</div>
+            )}
             {turn.tools && turn.tools.length ? (
               <div className="analyst-tools">
                 Checked:{" "}
@@ -137,9 +149,22 @@ export function Analyst({ result }: { result: ScanResult }) {
           </div>
         ))}
         {busy ? (
-          <div className="analyst-turn is-assistant">
+          <div
+            className="analyst-turn is-assistant is-thinking"
+            role="status"
+            aria-live="polite"
+            aria-label="Analyst is thinking"
+          >
             <span className="analyst-who">Analyst</span>
-            <div className="analyst-text analyst-thinking">Reading the evidence…</div>
+            <div className="analyst-thinking">
+              <span className="analyst-spinner" aria-hidden="true" />
+              <span className="analyst-thinking-copy">Reading the evidence</span>
+              <span className="analyst-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            </div>
           </div>
         ) : null}
         <div ref={endRef} />

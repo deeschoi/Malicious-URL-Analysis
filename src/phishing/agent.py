@@ -103,7 +103,12 @@ def briefing(result: dict[str, Any]) -> str:
         f"URL-only scoring: {bool(result.get('url_only'))}",
         f"Page-model score: {result.get('page_probability')}",
         f"URL-string score: {result.get('url_probability')}",
-        f"URL-pattern judgment: {result.get('url_pattern_risk')}",
+        (
+            "URL-pattern judgment: none (string was not phishing-shaped; "
+            "not a safety clearance)"
+            if result.get("url_pattern_risk") is None
+            else f"URL-pattern judgment: {result.get('url_pattern_risk')}"
+        ),
         f"Page/URL disagreement rule fired: {bool(result.get('url_disagreement'))}",
         (
             f"Reachability: {coverage.get('reachability')} | DNS ok: {coverage.get('dns_ok')} "
@@ -169,9 +174,15 @@ rows, so plain HTTP scores as phishing structurally; rare TLDs like `.io` and \
 the URL string alone; phishing kits hosted on trusted platforms \
 (firebaseapp.com, web.app, workers.dev) are the model's main live blind spot \
 because their platform HTML looks rich.
-6. Be concise and concrete. Name the feature, its measured value, and the \
-direction it pushed. Two or three short paragraphs, or a short list. No \
-preamble, no restating the question, no markdown headers.
+6. Structure every answer in exactly two sections, in this order, with these \
+exact headings on their own lines: `## Findings` then `## Commentary`. \
+Under Findings, list only measured evidence as bullets. Group bullets with \
+bold subsection labels when helpful, e.g. **Toward phishing** and **Toward \
+legitimate**. Each bullet names the feature, its measured value, and the SHAP \
+direction. Under Commentary, write one or two short paragraphs that synthesize \
+what the findings mean for this verdict, including limits and what would change \
+your read. Do not introduce new facts in Commentary that are not in Findings or \
+tool output. No preamble and no restating the question.
 7. SHAP values are log-odds contributions away from the model's average \
 prediction, not percentages of the verdict. Do not describe them as percentages.
 
