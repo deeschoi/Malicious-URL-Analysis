@@ -1,6 +1,8 @@
 # Sphinx
 
-Sphinx is a live phishing scanner. Paste a URL and it fetches the page (JavaScript is never executed), scores the risk with a trained classifier, and shows which signals decided the verdict.
+Sphinx is a live phishing scanner you run as a website: FastAPI serves the trained model and the React UI from one process. It is not the Python documentation generator of the same name. Paste a URL and it fetches the page (JavaScript is never executed), scores the risk with a trained classifier, and shows which signals decided the verdict.
+
+There is no login. Scanner, History, Stats, and Research findings work without any API key. The analyst chat is optional: paste your own [Groq](https://console.groq.com/keys) key (`gsk_…`) in the panel when you want an explanation. That key lives in the browser’s `sessionStorage`, is sent only on `POST /api/chat` as `X-Groq-Api-Key`, and is not stored on the server.
 
 The web app brands itself **Sphinx — URL Phishing Guardian**. Four sections:
 
@@ -28,8 +30,8 @@ phishing train
 
 cd web && npm install && npm run build && cd ..
 
-# optional: enable the analyst chat
-cp .env.example .env && $EDITOR .env    # set GROQ_API_KEY
+# optional: local Groq fallback so chat works without pasting a key in the UI
+cp .env.example .env && $EDITOR .env    # GROQ_API_KEY is optional
 
 uvicorn api.main:app --reload --port 8000
 ```
@@ -45,12 +47,36 @@ cd web && npm run dev                       # terminal 2, http://127.0.0.1:5173
 
 Vite proxies `/api` to port 8000. History and stats stay empty until you scan at least one URL.
 
-Or in a container. The image trains the model and builds the UI during the build, so it is reproducible from source alone and needs no pre-built artifact:
+Or in a container. The image trains the model and builds the UI during the build, so it is reproducible from source alone and needs no pre-built artifact. It listens on `$PORT` (default 8000) so the same image can run locally or on a host that injects the port:
 
 ```bash
 docker compose up --build                     # SQLite, data in a named volume
 docker compose --profile postgres up --build  # with Postgres alongside
 ```
+
+### Public demo (Render)
+
+Sphinx is a long-running app, not a static site: GitHub Pages and Read the Docs cannot run `/api/scan`. A README “try it” link needs the Docker image on a host that keeps `uvicorn` up (Render, Fly, Cloud Run, a VPS). The intended public setup is a **Render Docker web service**, **Free** instance, **ephemeral SQLite**, **no `GROQ_API_KEY`**.
+
+Visitors scan anonymously. Chat is bring-your-own-key so Groq bills them, not the operator. Health check **`/api/ready`** (not `/api/health`). First image build trains the model and can take 30–60+ minutes. Free instances sleep after idle; the next click pays a cold start. History and Stats reset when the instance is replaced unless you attach a disk or Postgres later. One instance, no autoscaling: rate limits are process-local.
+
+Dashboard env (never commit secrets):
+
+| Variable | Public demo |
+| --- | --- |
+| `GROQ_API_KEY` | omit |
+| `SPHINX_API_KEY` | omit (a key baked into the UI is not auth) |
+| `SPHINX_SCAN_RATE_PER_MINUTE` | `8` |
+| `SPHINX_SCAN_MAX_CONCURRENT` | `2` |
+| `SPHINX_CHAT_RATE_PER_MINUTE` | `5` |
+| `SPHINX_CHAT_MAX_CONCURRENT` | `1` |
+| `SPHINX_TRUST_PROXY_HEADERS` | `1` only because Render is the only ingress |
+
+Once the service has an HTTPS URL, put it here:
+
+**Live demo:** _(add the Render URL when the service is up)_
+
+[`render.yaml`](render.yaml) is the Blueprint for that service. Apply it from the Render dashboard (or create a Docker web service from this repo and copy the table above). Get a Groq key at [console.groq.com/keys](https://console.groq.com/keys).
 
 ### CLI
 
@@ -72,16 +98,18 @@ phishing scan --tier A https://example.com   # URL string only, no network fetch
 | `PHISHING_ARTIFACTS_DIR` | `$PHISHING_ROOT/artifacts` | Where the served model lives |
 | `PHISHING_REPORTS_DIR` | `$PHISHING_ROOT/reports` | Analysis tables and figures |
 | `PHISHING_DATABASE_URL` | `sqlite:///$PHISHING_ROOT/data/scans.db` | Scan telemetry store |
-| `SPHINX_API_KEY` | unset (routes open) | Shared secret for `/api/scan`, `/api/chat`, `/api/scans`, `/api/stats`, sent as `X-API-Key` |
+| `SPHINX_API_KEY` | unset (routes open) | Shared secret for `/api/scan`, `/api/chat`, `/api/scans`, `/api/stats`, sent as `X-API-Key`. Unused for Groq |
 | `SPHINX_SCAN_RATE_PER_MINUTE` | `20` | Per-caller scan budget |
 | `SPHINX_SCAN_MAX_CONCURRENT` | `4` | Scans in flight before the API returns 503 |
+| `SPHINX_CHAT_RATE_PER_MINUTE` | `30` | Per-caller chat budget (independent of scans) |
+| `SPHINX_CHAT_MAX_CONCURRENT` | `1` | Chat requests in flight before the API returns 503 |
 | `SPHINX_TRUST_PROXY_HEADERS` | `0` | Honour `X-Forwarded-For` for rate-limit identity. Only behind a proxy you control |
-| `GROQ_API_KEY` | unset (chat disabled) | Enables the analyst; the UI hides the panel without it |
+| `GROQ_API_KEY` | unset | Optional **local/operator fallback**. When unset, chat still works if the browser sends `X-Groq-Api-Key`. A public demo should omit this so visitors are billed, not you |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | Any tool-calling model Groq serves |
 
 Anything in `.env` at the repo root is loaded at startup and never overrides a real environment variable. `.env` is gitignored; `.env.example` documents every key.
 
-> **Before you expose this to a network.** `POST /api/scan` makes an outbound HTTP request to a URL the caller chooses. Set `SPHINX_API_KEY`, keep the rate limits on, and put it behind a reverse proxy. The compose file publishes port 8000 on `127.0.0.1` only, for that reason.
+> **Before you expose this to a network.** `POST /api/scan` makes an outbound HTTP request to a URL the caller chooses. Keep the rate limits on and put it behind a reverse proxy. A shared `SPHINX_API_KEY` in the frontend is extractable; the honest public-demo model is open routes + SSRF guards + tight limits, not a baked-in key. Omit `GROQ_API_KEY` on the host. The compose file publishes port 8000 on `127.0.0.1` only.
 
 ## What a scan does
 
@@ -152,6 +180,8 @@ A separate leak survives: `TLDLegitimateProb` is 0.013 for `.io` and 0.0015 for 
 
 Every result carries a chat panel. It is an explanation layer over a scan that already happened — the verdict, the probability, and the SHAP attributions are computed by the classifier before a single token is generated, and the model is told in as many words that its own impression of a URL string is not evidence. Changing the URL starts a new conversation, so evidence from one scan cannot leak into the next.
 
+Chat is opt-in. Scans never need Groq. If the server has no `GROQ_API_KEY`, the panel stays visible and asks for a visitor key from [console.groq.com/keys](https://console.groq.com/keys). Save stores it in `sessionStorage` (gone when the tab closes). `POST /api/chat` sends it as `X-Groq-Api-Key`; `/api/scan` never accepts that header. Locally you can keep `GROQ_API_KEY` in `.env` instead: `/api/agent` then reports `requires_user_key: false` and the chips work without pasting. A request header wins over the env key. Without either, chat returns 503.
+
 Starter chips on the panel: *Why this verdict?*, *What would change your mind?*, *What could this scan have missed?*, *How much should I trust this score?*
 
 Answers are required to use two headings, in that order:
@@ -185,7 +215,7 @@ The system prompt is server-side and non-negotiable. Client messages are filtere
 
 Asked about `http://neverssl.com`, which the scanner flags at *p* ≈ 1.0, it names `IsHTTPS` and its +10.9 log-odds contribution under Findings, then says in Commentary that the flag is more likely a false positive than evidence, because the training table has essentially no legitimate HTTP rows. That is the intended behaviour: the interesting answer is usually why a score should not be trusted.
 
-Transport is the OpenAI-compatible Groq endpoint over `requests` — no new dependency. Without `GROQ_API_KEY` the endpoint returns 503 and the panel explains how to enable it.
+Transport is the OpenAI-compatible Groq endpoint over `requests` — no new dependency. Chat is opt-in BYOK: the browser sends `X-Groq-Api-Key` from `sessionStorage`, or the server uses `GROQ_API_KEY` if the operator set one. With neither, `/api/chat` returns 503. Scans never need a Groq key. Chat uses its own limiter (`SPHINX_CHAT_RATE_PER_MINUTE` / `SPHINX_CHAT_MAX_CONCURRENT`), not the scan budget.
 
 ## Train, test, and research scripts
 
@@ -221,7 +251,7 @@ src/phishing/
   fit.py                              train the PhiUSIIL scanner model
   scanner.py                          live scan → verdict, SHAP, coverage, URL-pattern chip
   netguard.py                         SSRF guards: redirects, rebinding, metadata IPs
-  agent.py                            Groq-backed analyst: Findings / Commentary + tool loop
+  agent.py                            Groq-backed analyst: Findings / Commentary + tool loop; key is an argument, not env inside `_post`
   settings.py                         env / .env configuration and secrets
   cli.py                              train | scan | evaluate | validate
   data.py                             PhiUSIIL + UCI loaders, grouped splits
@@ -233,14 +263,15 @@ src/phishing/
     url_features.py / content_…       2012 extractors (research / validate)
 analysis/                             01–05: UCI research; 06: train; 07: live eval
 api/main.py                           FastAPI (scan, chat, scans, stats, findings, UI)
-api/security.py                       rate limits, concurrency cap, optional API key
-web/                                  React + Vite + TypeScript (Sphinx UI; Findings / Commentary in analystReply.ts)
+api/security.py                       scan + chat rate limits, concurrency caps, optional API key
+web/                                  React + Vite + TypeScript (Sphinx UI; Findings / Commentary in analystReply.ts; BYOK key in groqKey.ts)
 migrations/                           alembic revisions for the scans table
 tests/                                pytest; network tests marked skippable
 notebooks/                            stages 1–3 narrative (2012)
 reports/                              CSV / JSON / figures, including the model card
 artifacts/model.joblib                fitted PhiUSIIL model (gitignored; run train)
-Dockerfile                            trains the model at build, serves via uvicorn
+Dockerfile                            trains the model at build, serves via uvicorn on $PORT
+render.yaml                           public demo: Free Docker, SQLite, Groq omitted, tight limits
 ```
 
 ## Limitations
@@ -254,7 +285,7 @@ Dockerfile                            trains the model at build, serves via uvic
 - The served model is **not calibrated**. Holdout Brier is 0.0004 on frozen columns, but live false positives pin at *p* ≈ 1.0 and platform-hosted kits at *p* ≈ 0. Read the gauge as a score, not as a frequency.
 - Rate limits and the concurrency cap are process-local. Replicating the API needs a shared store (Redis) to hold across instances.
 - Unreachable hosts with a clean origin get no `url_pattern_risk` chip. Absence of a chip is not a legitimate verdict.
-- The analyst explains a scan; it does not add detection. It can only be as right as the scan it is reading, and it is a language model — the tool trail under each answer is there to be checked.
+- The analyst explains a scan; it does not add detection. It can only be as right as the scan it is reading, and it is a language model — the tool trail under each answer is there to be checked. A visitor Groq key transits HTTPS to this API for that request; treat the operator as trusted for the duration of the chat.
 
 ## References
 

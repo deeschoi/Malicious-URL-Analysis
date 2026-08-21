@@ -16,6 +16,8 @@ from collections import defaultdict, deque
 from fastapi import Header, HTTPException, Request
 
 from phishing.settings import (
+    CHAT_MAX_CONCURRENT,
+    CHAT_RATE_PER_MINUTE,
     SCAN_MAX_CONCURRENT,
     SCAN_RATE_PER_MINUTE,
     api_key,
@@ -27,9 +29,16 @@ WINDOW_SECONDS = 60.0
 class RateLimiter:
     """Sliding-window counter keyed by client, with a global in-flight cap."""
 
-    def __init__(self, per_minute: int, max_concurrent: int) -> None:
+    def __init__(
+        self,
+        per_minute: int,
+        max_concurrent: int,
+        *,
+        busy_detail: str = "Too many scans in flight. Try again in a moment.",
+    ) -> None:
         self.per_minute = max(0, per_minute)
         self.max_concurrent = max(1, max_concurrent)
+        self.busy_detail = busy_detail
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
         self._slots = threading.BoundedSemaphore(self.max_concurrent)
@@ -62,21 +71,22 @@ class RateLimiter:
                     del self._hits[key]
 
     def slot(self) -> _Slot:
-        return _Slot(self._slots)
+        return _Slot(self._slots, self.busy_detail)
 
 
 class _Slot:
     """Context manager that refuses rather than queues when the pool is full."""
 
-    def __init__(self, semaphore: threading.BoundedSemaphore) -> None:
+    def __init__(self, semaphore: threading.BoundedSemaphore, busy_detail: str) -> None:
         self._semaphore = semaphore
+        self._busy_detail = busy_detail
         self._held = False
 
     def __enter__(self) -> _Slot:
         if not self._semaphore.acquire(blocking=False):
             raise HTTPException(
                 status_code=503,
-                detail="Too many scans in flight. Try again in a moment.",
+                detail=self._busy_detail,
                 headers={"Retry-After": "5"},
             )
         self._held = True
@@ -89,6 +99,11 @@ class _Slot:
 
 
 scan_limiter = RateLimiter(SCAN_RATE_PER_MINUTE, SCAN_MAX_CONCURRENT)
+chat_limiter = RateLimiter(
+    CHAT_RATE_PER_MINUTE,
+    CHAT_MAX_CONCURRENT,
+    busy_detail="Too many chat requests in flight. Try again in a moment.",
+)
 
 
 def client_key(request: Request) -> str:

@@ -70,12 +70,15 @@ COPY --from=frontend /web/dist ./web/dist
 RUN chown -R scanner:scanner /app
 USER scanner
 
+# Local/compose default. Render injects PORT at runtime (often 10000).
+ENV PORT=8000
 EXPOSE 8000
 
 # Readiness, not liveness: /api/health answers ok even with no model artifact
 # and no database, so an unhealthy instance kept receiving traffic and 503ing
 # every scan. /api/ready loads the artifact and pings the database.
+# Shell form so $PORT expands; JSON exec form would keep 8000 forever.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8000/api/ready || exit 1
+    CMD curl -fsS http://127.0.0.1:${PORT:-8000}/api/ready || exit 1
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

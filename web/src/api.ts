@@ -1,3 +1,5 @@
+import { getGroqApiKey } from "./groqKey";
+
 export function errorMessage(payload: unknown, fallback = "Request failed."): string {
   if (payload && typeof payload === "object" && "detail" in payload) {
     const detail = (payload as { detail: unknown }).detail;
@@ -51,8 +53,12 @@ export function askAnalyst(
   messages: import("./types").ChatMessage[],
   signal?: AbortSignal,
 ) {
+  const headers: Record<string, string> = {};
+  const groq = getGroqApiKey();
+  if (groq) headers["X-Groq-Api-Key"] = groq;
   return request<import("./types").ChatReply>("/api/chat", {
     method: "POST",
+    headers,
     body: JSON.stringify({ scan, messages }),
     signal,
   });

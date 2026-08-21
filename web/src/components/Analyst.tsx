@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { askAnalyst, fetchAgentStatus } from "../api";
+import { clearGroqApiKey, getGroqApiKey, setGroqApiKey } from "../groqKey";
 import type { AgentStatus, ChatMessage, ScanResult, ToolUse } from "../types";
 import { AnalystReply } from "./AnalystReply";
 
@@ -31,6 +32,8 @@ export function Analyst({ result }: { result: ScanResult }) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
+  const [keyDraft, setKeyDraft] = useState("");
+  const [hasKey, setHasKey] = useState(() => Boolean(getGroqApiKey()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -42,7 +45,14 @@ export function Analyst({ result }: { result: ScanResult }) {
         if (!cancelled) setStatus(payload);
       })
       .catch(() => {
-        if (!cancelled) setStatus({ enabled: false, model: null, detail: null });
+        if (!cancelled) {
+          setStatus({
+            enabled: true,
+            requires_user_key: true,
+            model: null,
+            detail: null,
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -61,9 +71,12 @@ export function Analyst({ result }: { result: ScanResult }) {
     endRef.current?.scrollIntoView({ block: "nearest" });
   }, [turns, busy]);
 
+  const needsKey = Boolean(status?.requires_user_key) && !hasKey;
+  const chatLocked = needsKey || busy;
+
   async function ask(question: string) {
     const text = question.trim();
-    if (!text || busy) return;
+    if (!text || chatLocked) return;
     const next: Turn[] = [...turns, { role: "user", content: text }];
     setTurns(next);
     setDraft("");
@@ -95,7 +108,26 @@ export function Analyst({ result }: { result: ScanResult }) {
     void ask(draft);
   }
 
-  if (status && !status.enabled) {
+  function onSaveKey(event: FormEvent) {
+    event.preventDefault();
+    const value = keyDraft.trim();
+    if (!value.startsWith("gsk_") || value.length < 8) {
+      setError("Groq keys start with gsk_.");
+      return;
+    }
+    setGroqApiKey(value);
+    setKeyDraft("");
+    setHasKey(true);
+    setError(null);
+  }
+
+  function onClearKey() {
+    clearGroqApiKey();
+    setHasKey(false);
+    setError(null);
+  }
+
+  if (status && status.enabled === false) {
     return (
       <section className="analyst is-off">
         <h3 className="section-title">Ask about this scan</h3>
@@ -117,10 +149,55 @@ export function Analyst({ result }: { result: ScanResult }) {
         not produce one of its own.
       </p>
 
+      {needsKey ? (
+        <form className="analyst-key" onSubmit={onSaveKey} autoComplete="off">
+          <p className="analyst-key-trust">
+            {status?.detail ??
+              "Scans work without a key. Chat needs a Groq API key from you."}{" "}
+            The key is sent only with chat, not stored on the server, and gone
+            when this tab closes.
+          </p>
+          <div className="analyst-key-row">
+            <input
+              className="url-input"
+              type="password"
+              value={keyDraft}
+              onChange={(event) => setKeyDraft(event.target.value)}
+              placeholder="gsk_…"
+              aria-label="Groq API key"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              className="scan-button"
+              type="submit"
+              disabled={!keyDraft.trim()}
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {status?.requires_user_key && hasKey ? (
+        <p className="analyst-key-saved">
+          Using a session Groq key.{" "}
+          <button
+            type="button"
+            className="analyst-key-clear"
+            onClick={onClearKey}
+          >
+            Clear
+          </button>
+        </p>
+      ) : null}
+
       <div className="analyst-log" aria-live="polite" aria-busy={busy}>
         {turns.length === 0 && !busy ? (
           <p className="analyst-hint">
-            Nothing asked yet. Try one of the questions below.
+            {needsKey
+              ? "Save a Groq key above to ask about this scan."
+              : "Nothing asked yet. Try one of the questions below."}
           </p>
         ) : null}
         {turns.map((turn, index) => (
@@ -182,7 +259,7 @@ export function Analyst({ result }: { result: ScanResult }) {
             key={prompt}
             type="button"
             className="chip"
-            disabled={busy}
+            disabled={chatLocked}
             onClick={() => void ask(prompt)}
           >
             {prompt}
@@ -198,9 +275,13 @@ export function Analyst({ result }: { result: ScanResult }) {
           placeholder="Ask about the signals, the score, or what was missed"
           aria-label="Ask the analyst about this scan"
           maxLength={2000}
-          disabled={busy}
+          disabled={chatLocked}
         />
-        <button className="scan-button" type="submit" disabled={busy || !draft.trim()}>
+        <button
+          className="scan-button"
+          type="submit"
+          disabled={chatLocked || !draft.trim()}
+        >
           Ask
         </button>
       </form>

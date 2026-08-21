@@ -8,19 +8,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from api.security import client_key, require_api_key, scan_limiter
+from api.security import chat_limiter, client_key, require_api_key, scan_limiter
 from phishing.agent import AgentUnavailableError
 from phishing.agent import answer as agent_answer
-from phishing.agent import is_enabled as agent_enabled
 from phishing.db import init_db, recent_scans, record_scan, scan_stats
 from phishing.netguard import UnsafeTargetError
 from phishing.scanner import available_models, research_findings, scan
-from phishing.settings import GROQ_MODEL
+from phishing.settings import GROQ_MODEL, groq_api_key
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST_DIR = ROOT / "web" / "dist"
@@ -102,27 +101,49 @@ def scan_url(request: ScanRequest, http_request: Request) -> dict:
 
 @app.get("/api/agent")
 def agent_status() -> dict:
-    """Whether the analyst chat is configured, so the UI can hide it if not."""
+    """Whether chat needs a visitor-supplied Groq key.
+
+    The panel is always offered. Scans do not need a key. Chat does, from the
+    browser (``X-Groq-Api-Key``) or from optional server ``GROQ_API_KEY``.
+    """
+    server_key = bool(groq_api_key())
     return {
-        "enabled": agent_enabled(),
-        "model": GROQ_MODEL if agent_enabled() else None,
+        "enabled": True,
+        "requires_user_key": not server_key,
+        "model": GROQ_MODEL,
         "detail": (
-            "Set GROQ_API_KEY in .env at the repo root to enable the analyst."
-            if not agent_enabled()
-            else None
+            None
+            if server_key
+            else (
+                "Scans work without a key. Chat needs a Groq API key from you "
+                "(https://console.groq.com/keys). The key is sent only with "
+                "chat requests and is not stored on the server."
+            )
         ),
     }
 
 
 @app.post("/api/chat", dependencies=[Depends(require_api_key)])
-def chat(request: ChatRequest, http_request: Request) -> dict:
-    """Answer a question about a scan, grounded in that scan's evidence."""
-    scan_limiter.check(f"chat:{client_key(http_request)}")
+def chat(
+    request: ChatRequest,
+    http_request: Request,
+    x_groq_api_key: str | None = Header(default=None),
+) -> dict:
+    """Answer a question about a scan, grounded in that scan's evidence.
+
+    ``X-Groq-Api-Key`` is optional when the server has ``GROQ_API_KEY``. The
+    header is never logged and is not accepted on ``/api/scan``.
+    """
+    chat_limiter.check(client_key(http_request))
+    # Header wins; env is fallback only. Do not interpolate the value anywhere.
+    key = (x_groq_api_key or "").strip() or groq_api_key()
     try:
-        return agent_answer(
-            request.scan,
-            [message.model_dump() for message in request.messages],
-        )
+        with chat_limiter.slot():
+            return agent_answer(
+                request.scan,
+                [message.model_dump() for message in request.messages],
+                api_key=key,
+            )
     except AgentUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
@@ -214,7 +235,7 @@ def ready() -> dict:
         checks["database"] = f"{type(exc).__name__}: {exc}"
 
     checks["frontend"] = "built" if (DIST_DIR / "index.html").is_file() else "not built"
-    checks["analyst"] = "enabled" if agent_enabled() else "disabled"
+    checks["analyst"] = "server_key" if groq_api_key() else "byok"
     if not ok:
         raise HTTPException(status_code=503, detail={"status": "not ready", **checks})
     return {"status": "ready", **checks}

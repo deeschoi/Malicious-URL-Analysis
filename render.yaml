@@ -1,0 +1,21 @@
+# Public demo: Free Docker web service, ephemeral SQLite, Groq BYOK.
+# Do not put GROQ_API_KEY or SPHINX_API_KEY here — chat bills the visitor
+# who pastes a key, and a baked Sphinx key is not real auth.
+services:
+  - type: web
+    name: sphinx
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/ready
+    envVars:
+      - key: SPHINX_SCAN_RATE_PER_MINUTE
+        value: "8"
+      - key: SPHINX_SCAN_MAX_CONCURRENT
+        value: "2"
+      - key: SPHINX_CHAT_RATE_PER_MINUTE
+        value: "5"
+      - key: SPHINX_CHAT_MAX_CONCURRENT
+        value: "1"
+      - key: SPHINX_TRUST_PROXY_HEADERS
+        value: "1"

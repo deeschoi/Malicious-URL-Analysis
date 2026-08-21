@@ -45,7 +45,24 @@ class AgentUnavailableError(RuntimeError):
     """No Groq credentials, or the upstream API refused the request."""
 
 
+MAX_GROQ_KEY_LENGTH = 256
+
+
+def looks_like_groq_key(key: str) -> bool:
+    """Cheap shape check so junk fails here, not after a Groq round-trip."""
+    if not (8 <= len(key) <= MAX_GROQ_KEY_LENGTH):
+        return False
+    if not key.startswith("gsk_"):
+        return False
+    rest = key[4:]
+    return rest.isascii() and rest.isprintable() and " " not in rest
+
+
 def is_enabled() -> bool:
+    """Whether the operator configured a server-side Groq key.
+
+    Chat can still run without this: the browser may send ``X-Groq-Api-Key``.
+    """
     return bool(groq_api_key())
 
 
@@ -455,11 +472,12 @@ class ScanTools:
 # --------------------------------------------------------------------------
 
 
-def _post(payload: dict[str, Any]) -> dict[str, Any]:
-    key = groq_api_key()
+def _post(payload: dict[str, Any], api_key: str) -> dict[str, Any]:
+    key = (api_key or "").strip()
     if not key:
         raise AgentUnavailableError(
-            "No GROQ_API_KEY configured. Add it to .env at the repo root to enable chat."
+            "Chat needs a Groq API key. Paste one in the analyst panel "
+            "(https://console.groq.com/keys) or set GROQ_API_KEY on the server."
         )
     try:
         response = requests.post(
@@ -482,7 +500,7 @@ def _post(payload: dict[str, Any]) -> dict[str, Any]:
     except ValueError:
         detail = response.text[:200]
     if response.status_code == 401:
-        raise AgentUnavailableError("Groq rejected the API key.")
+        raise AgentUnavailableError("Invalid Groq API key.")
     if response.status_code == 429:
         retry_after = response.headers.get("retry-after")
         wait = f" Try again in {retry_after}s." if retry_after else " Try again shortly."
@@ -511,13 +529,25 @@ def answer(
     scan_result: dict[str, Any],
     messages: list[dict[str, Any]],
     *,
+    api_key: str | None = None,
     model: str | None = None,
 ) -> dict[str, Any]:
     """Answer the latest user turn about ``scan_result``, running tools as needed.
 
     Returns the reply plus the tools that were called, so the UI can show what
     the answer was grounded in rather than asking the user to take it on faith.
+    ``api_key`` is the Groq credential for this request (browser header or
+    server env). It is never logged.
     """
+    key = (api_key or "").strip()
+    if not key:
+        raise AgentUnavailableError(
+            "Chat needs a Groq API key. Paste one in the analyst panel "
+            "(https://console.groq.com/keys) or set GROQ_API_KEY on the server."
+        )
+    if not looks_like_groq_key(key):
+        raise ValueError("Invalid Groq API key.")
+
     history = _sanitise_history(messages)
     if not history or history[-1]["role"] != "user":
         raise ValueError("The last message must be from the user.")
@@ -542,7 +572,7 @@ def answer(
             "temperature": 0.2,
             "max_completion_tokens": 1200,
         }
-        data = _post(payload)
+        data = _post(payload, api_key=key)
         choices = data.get("choices") or []
         if not choices:
             raise AgentUnavailableError("Groq returned no completion.")
@@ -603,7 +633,8 @@ def answer(
             ],
             "temperature": 0.2,
             "max_completion_tokens": 1200,
-        }
+        },
+        api_key=key,
     )
     final = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
     if not final.strip():

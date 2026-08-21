@@ -205,7 +205,11 @@ def test_history_is_length_capped():
 
 def test_answer_requires_the_last_turn_to_be_the_user():
     with pytest.raises(ValueError, match="last message"):
-        answer(_scan(), [{"role": "assistant", "content": "hello"}])
+        answer(
+            _scan(),
+            [{"role": "assistant", "content": "hello"}],
+            api_key="gsk_unit_test_key",
+        )
 
 
 # --- the loop ----------------------------------------------------------------
@@ -217,22 +221,34 @@ class _FakeGroq:
     def __init__(self, replies):
         self.replies = list(replies)
         self.sent = []
+        self.keys = []
 
-    def __call__(self, payload):
+    def __call__(self, payload, api_key=""):
         self.sent.append(payload)
+        self.keys.append(api_key)
         return {"model": "fake", "choices": [{"message": self.replies.pop(0)}]}
+
+
+FAKE_KEY = "gsk_unit_test_key"
 
 
 def test_answer_returns_a_direct_reply_when_no_tool_is_called(monkeypatch):
     fake = _FakeGroq([{"content": "Because the page had three off-domain links."}])
     monkeypatch.setattr(agent, "_post", fake)
-    out = answer(_scan(), [{"role": "user", "content": "why?"}])
+    out = answer(_scan(), [{"role": "user", "content": "why?"}], api_key=FAKE_KEY)
     assert out["reply"].startswith("Because")
     assert out["tools_used"] == []
     # The system prompt is ours and carries the scan briefing.
     system = fake.sent[0]["messages"][0]
     assert system["role"] == "system"
     assert "Verdict: suspicious" in system["content"]
+
+
+def test_answer_posts_with_the_supplied_api_key(monkeypatch):
+    fake = _FakeGroq([{"content": "Because."}])
+    monkeypatch.setattr(agent, "_post", fake)
+    answer(_scan(), [{"role": "user", "content": "why?"}], api_key="gsk_from_caller")
+    assert fake.keys == ["gsk_from_caller"]
 
 
 def test_answer_runs_a_tool_and_feeds_the_result_back(monkeypatch):
@@ -254,7 +270,11 @@ def test_answer_runs_a_tool_and_feeds_the_result_back(monkeypatch):
         ]
     )
     monkeypatch.setattr(agent, "_post", fake)
-    out = answer(_scan(), [{"role": "user", "content": "how many external links?"}])
+    out = answer(
+        _scan(),
+        [{"role": "user", "content": "how many external links?"}],
+        api_key=FAKE_KEY,
+    )
 
     assert out["tools_used"] == [
         {"tool": "get_features", "arguments": {"names": ["NoOfExternalRef"]}}
@@ -278,7 +298,7 @@ def test_malformed_tool_arguments_do_not_crash_the_loop(monkeypatch):
         ]
     )
     monkeypatch.setattr(agent, "_post", fake)
-    out = answer(_scan(), [{"role": "user", "content": "signals?"}])
+    out = answer(_scan(), [{"role": "user", "content": "signals?"}], api_key=FAKE_KEY)
     assert out["reply"] == "Here are the signals."
 
 
@@ -286,13 +306,24 @@ def test_an_empty_completion_is_reported_rather_than_returned(monkeypatch):
     monkeypatch.setattr(
         agent,
         "_post",
-        lambda payload: {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]},
+        lambda payload, api_key="": {
+            "choices": [{"message": {"content": ""}, "finish_reason": "length"}]
+        },
     )
     with pytest.raises(AgentUnavailableError, match="empty answer"):
+        answer(_scan(), [{"role": "user", "content": "why?"}], api_key=FAKE_KEY)
+
+
+def test_missing_credentials_raise_a_useful_message():
+    with pytest.raises(AgentUnavailableError, match="Groq API key"):
         answer(_scan(), [{"role": "user", "content": "why?"}])
 
 
-def test_missing_credentials_raise_a_useful_message(monkeypatch):
-    monkeypatch.setattr(agent, "groq_api_key", lambda: "")
-    with pytest.raises(AgentUnavailableError, match="GROQ_API_KEY"):
-        answer(_scan(), [{"role": "user", "content": "why?"}])
+def test_malformed_key_is_rejected_before_contacting_groq(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "_post",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call Groq")),
+    )
+    with pytest.raises(ValueError, match="Invalid Groq API key"):
+        answer(_scan(), [{"role": "user", "content": "why?"}], api_key="not-a-key")

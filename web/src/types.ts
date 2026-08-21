@@ -164,6 +164,8 @@ export interface ChatReply {
 
 export interface AgentStatus {
   enabled: boolean;
+  /** True when the server has no GROQ_API_KEY and the visitor must paste one. */
+  requires_user_key?: boolean;
   model: string | null;
   detail: string | null;
 }

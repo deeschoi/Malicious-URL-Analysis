@@ -61,7 +61,10 @@ def env_bool(name: str, default: bool = False) -> bool:
 # caller can exhaust sockets and use the service as an outbound proxy.
 SCAN_RATE_PER_MINUTE = env_int("SPHINX_SCAN_RATE_PER_MINUTE", 20)
 SCAN_MAX_CONCURRENT = env_int("SPHINX_SCAN_MAX_CONCURRENT", 4)
+# Chat is a separate budget so a public demo cannot be used as a Groq proxy.
+# Local defaults are generous; a hosted demo should set 5 / 1.
 CHAT_RATE_PER_MINUTE = env_int("SPHINX_CHAT_RATE_PER_MINUTE", 30)
+CHAT_MAX_CONCURRENT = env_int("SPHINX_CHAT_MAX_CONCURRENT", 1)
 
 
 def api_key() -> str:
@@ -75,6 +78,8 @@ def api_key() -> str:
 
 
 # --- Groq-backed analyst chat ------------------------------------------------
+# Optional local/operator fallback. A public demo should omit this so Groq
+# bills the visitor who pasted X-Groq-Api-Key, not the person hosting Sphinx.
 def groq_api_key() -> str:
     return env("GROQ_API_KEY", "").strip()
 

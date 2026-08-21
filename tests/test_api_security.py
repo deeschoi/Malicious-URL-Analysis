@@ -13,6 +13,7 @@ from api.main import app
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     monkeypatch.setenv("PHISHING_DATABASE_URL", f"sqlite:///{tmp_path / 'scans.db'}")
+    monkeypatch.setenv("GROQ_API_KEY", "")
     from phishing import db
 
     monkeypatch.setattr(db, "_engine", None)
@@ -129,27 +130,77 @@ def test_readiness_checks_the_model_and_the_database(client):
 # --- analyst -----------------------------------------------------------------
 
 
-def test_agent_status_reports_when_no_key_is_configured(client, monkeypatch):
-    monkeypatch.setattr("api.main.agent_enabled", lambda: False)
+CHAT = {
+    "scan": {"url": "https://example.com"},
+    "messages": [{"role": "user", "content": "why?"}],
+}
+USER_KEY = "gsk_user_supplied_key_ok"
+
+
+def test_agent_status_offers_byok_when_no_server_key(client, monkeypatch):
+    monkeypatch.setattr("api.main.groq_api_key", lambda: "")
     body = client.get("/api/agent").json()
-    assert body["enabled"] is False
-    assert body["model"] is None
-    assert "GROQ_API_KEY" in body["detail"]
+    assert body["enabled"] is True
+    assert body["requires_user_key"] is True
+    assert body["model"]
+    assert "console.groq.com" in body["detail"]
 
 
-def test_chat_returns_503_when_the_analyst_is_unconfigured(client, monkeypatch):
-    from phishing import agent
+def test_agent_status_uses_server_key_when_configured(client, monkeypatch):
+    monkeypatch.setattr("api.main.groq_api_key", lambda: "gsk_server")
+    body = client.get("/api/agent").json()
+    assert body["enabled"] is True
+    assert body["requires_user_key"] is False
+    assert body["detail"] is None
 
-    monkeypatch.setattr(agent, "groq_api_key", lambda: "")
+
+def test_chat_returns_503_when_neither_key_is_present(client, monkeypatch):
+    monkeypatch.setattr("api.main.groq_api_key", lambda: "")
+    response = client.post("/api/chat", json=CHAT)
+    assert response.status_code == 503
+    assert "Groq API key" in response.json()["detail"]
+
+
+def test_chat_uses_the_request_header_key(client, monkeypatch):
+    seen: dict[str, str] = {}
+
+    def fake_answer(scan, messages, *, api_key="", model=None):
+        seen["api_key"] = api_key
+        return {"reply": "ok", "tools_used": [], "model": "fake"}
+
+    monkeypatch.setattr("api.main.agent_answer", fake_answer)
+    monkeypatch.setattr("api.main.groq_api_key", lambda: "gsk_server_fallback")
     response = client.post(
         "/api/chat",
-        json={
-            "scan": {"url": "https://example.com"},
-            "messages": [{"role": "user", "content": "why?"}],
-        },
+        json=CHAT,
+        headers={"X-Groq-Api-Key": USER_KEY},
     )
-    assert response.status_code == 503
-    assert "GROQ_API_KEY" in response.json()["detail"]
+    assert response.status_code == 200
+    assert seen["api_key"] == USER_KEY
+
+
+def test_scan_does_not_require_a_groq_header(client):
+    response = client.post(
+        "/api/scan",
+        json={"url": "http://127.0.0.1/"},
+        headers={"X-Groq-Api-Key": USER_KEY},
+    )
+    assert response.status_code == 403
+
+
+def test_chat_returns_429_after_the_chat_budget(client, monkeypatch):
+    tight = security.RateLimiter(per_minute=2, max_concurrent=4)
+    monkeypatch.setattr("api.main.chat_limiter", tight)
+    monkeypatch.setattr(
+        "api.main.agent_answer",
+        lambda *a, **k: {"reply": "ok", "tools_used": [], "model": "fake"},
+    )
+    headers = {"X-Groq-Api-Key": USER_KEY}
+    assert client.post("/api/chat", json=CHAT, headers=headers).status_code == 200
+    assert client.post("/api/chat", json=CHAT, headers=headers).status_code == 200
+    limited = client.post("/api/chat", json=CHAT, headers=headers)
+    assert limited.status_code == 429
+    assert "Retry-After" in limited.headers
 
 
 def test_chat_rejects_a_system_role_from_the_client(client):
