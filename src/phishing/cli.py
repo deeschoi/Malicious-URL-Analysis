@@ -34,7 +34,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_train(args: argparse.Namespace) -> int:
+def cmd_train(_args: argparse.Namespace) -> int:
     """Train the PhiUSIIL scanner model and persist it."""
     from phishing.fit import train_phiusiil_model
 
@@ -52,10 +52,6 @@ def cmd_train(args: argparse.Namespace) -> int:
             f"recall={report['recall']:.3f}  fpr={report['fpr']:.3f}"
         )
     print(f"Saved {card['artifact']}")
-    if args.tune:
-        print("Note: --tune is ignored; the served model uses the default XGBoost.")
-    if args.quick:
-        print("Note: --quick is ignored; PhiUSIIL training always uses XGBoost.")
     return 0
 
 
@@ -74,7 +70,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_validate(args: argparse.Namespace) -> int:
+def cmd_validate(_args: argparse.Namespace) -> int:
     """Compare live Tier-A features on known URLs against the 2012 legitimate class."""
     from phishing.config import TARGET_COLUMN, TIER_A
     from phishing.data import load_raw, to_model_frame
@@ -154,15 +150,15 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--quick", action="store_true", help="notebook's three models only")
     ev.set_defaults(func=cmd_evaluate)
 
+    # --tune and --quick used to be accepted here and then printed that they
+    # were ignored; --model on `scan` was parsed and never read. Flags that do
+    # nothing are worse than absent ones, so they are gone.
     tr = sub.add_parser("train", help="train and persist the PhiUSIIL scanner model")
-    tr.add_argument("--quick", action="store_true", help="skip XGBoost/LightGBM")
-    tr.add_argument("--tune", action="store_true", help="RandomizedSearchCV on the winner")
     tr.set_defaults(func=cmd_train)
 
     sc = sub.add_parser("scan", help="extract features and score a URL")
     sc.add_argument("url")
     sc.add_argument("--tier", choices=["A", "B", "full"], default="full")
-    sc.add_argument("--model", default=None)
     sc.set_defaults(func=cmd_scan)
 
     va = sub.add_parser("validate", help="Tier-A drift vs 2012 legitimate class")

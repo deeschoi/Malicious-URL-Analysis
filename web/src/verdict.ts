@@ -6,7 +6,9 @@ export const VERDICT_LABEL: Record<string, string> = {
   "probably safe": "probably safe",
   legitimate: "legitimate",
   unreachable: "unreachable",
-  fetch_failed: "fetch failed",
+  // The API withholds a rating for an offline scan. Without a label here the
+  // badge rendered the raw identifier.
+  not_probed: "not rated",
 };
 
 export const BADGE_CLASS: Record<string, string> = {
@@ -15,16 +17,16 @@ export const BADGE_CLASS: Record<string, string> = {
   "probably safe": "is-safe",
   legitimate: "is-safe",
   unreachable: "is-unknown",
-  fetch_failed: "is-unknown",
+  not_probed: "is-unknown",
 };
 
 export const GAUGE_COLOUR: Record<string, string> = {
   phishing: "#ff5f56",
   suspicious: "#f5a524",
-  "probably safe": "#35c98b",
+  "probably safe": "#8fbf6a",
   legitimate: "#35c98b",
   unreachable: "#a89478",
-  fetch_failed: "#a89478",
+  not_probed: "#a89478",
 };
 
 export const VERDICT_ORDER = [
@@ -33,8 +35,17 @@ export const VERDICT_ORDER = [
   "probably safe",
   "legitimate",
   "unreachable",
-  "fetch_failed",
+  "not_probed",
 ] as const;
+
+/** Verdicts that are not a live-site rating. The API withholds `risk` for
+ *  exactly these, so the UI offers the URL-string judgment instead.
+ *  `fetch_failed` used to be listed here and is never returned as a verdict —
+ *  a failed fetch still gets a real risk band from the URL-only model. */
+export const WITHHELD_VERDICTS: ReadonlySet<string> = new Set([
+  "unreachable",
+  "not_probed",
+]);
 
 export function verdictLabel(verdict: string): string {
   return VERDICT_LABEL[verdict] ?? verdict;

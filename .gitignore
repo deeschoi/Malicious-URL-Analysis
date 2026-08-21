@@ -16,3 +16,4 @@ reports/figures/
 htmlcov/
 web/node_modules/
 web/dist/
+.env

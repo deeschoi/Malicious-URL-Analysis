@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
@@ -34,6 +35,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 from phishing.config import PROJECT_ROOT
 from phishing.features.reachability import LIVE_RISK_VERDICTS
+from phishing.netguard import strip_userinfo
 
 DEFAULT_DATABASE_URL = f"sqlite:///{PROJECT_ROOT / 'data' / 'scans.db'}"
 
@@ -102,11 +104,35 @@ def get_engine():
             path = url.removeprefix("sqlite:///")
             if path and path != ":memory:":
                 os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        is_sqlite = url.startswith("sqlite")
         # check_same_thread=False: FastAPI serves requests on a threadpool.
-        connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+        # timeout: without it SQLite fails immediately on a locked database, and
+        # record_scan swallows the error, so history silently drops under load.
+        connect_args = {"check_same_thread": False, "timeout": 15} if is_sqlite else {}
         _engine = create_engine(url, future=True, connect_args=connect_args)
+        if is_sqlite:
+            _enable_sqlite_wal(_engine)
         _Session = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
     return _engine
+
+
+def _enable_sqlite_wal(engine) -> None:
+    """Write-ahead logging so a reader does not block the writer.
+
+    The default rollback journal serialises every reader against the writer,
+    which shows up as dropped telemetry the moment two scans overlap.
+    """
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _set_pragmas(dbapi_connection, _record):  # pragma: no cover - driver callback
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=15000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cursor.close()
 
 
 def init_db() -> None:
@@ -128,9 +154,30 @@ def session_scope() -> Iterator[Session]:
         session.close()
 
 
+_HIGH_ENTROPY = re.compile(r"^(?=.*\d)(?=.*[A-Za-z])[A-Za-z0-9_-]{16,}$|^[A-Fa-f0-9]{24,}$")
+
+
+def _redact_path(path: str) -> str:
+    """Replace token-shaped path segments with a placeholder.
+
+    Dropping the query string is necessary but not sufficient: password resets
+    and magic links routinely put the secret in the path
+    (``/reset/9f3c1a...``), and scan history is not the place for it. Only
+    segments that look like opaque tokens are touched, so ``/en-us/pricing``
+    survives intact and history stays readable.
+    """
+    if not path:
+        return path
+    parts = []
+    for segment in path.split("/"):
+        parts.append("[redacted]" if _HIGH_ENTROPY.match(segment) else segment)
+    return "/".join(parts)
+
+
 def strip_query(url: str) -> str:
-    parsed = urlparse(url)
-    return urlunparse(parsed._replace(query="", fragment=""))
+    """Canonical stored form: no credentials, no query, no fragment, no path tokens."""
+    parsed = urlparse(strip_userinfo(url))
+    return urlunparse(parsed._replace(path=_redact_path(parsed.path), query="", fragment=""))
 
 
 def record_scan(result: dict[str, Any], duration_ms: int = 0) -> int | None:
@@ -177,13 +224,37 @@ def recent_scans(limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         return [row.to_dict() for row in rows]
 
 
-def scan_stats(days: int = 30) -> dict[str, Any]:
-    """Verdict mix and mean score per day — the drift signal for the deployed model."""
+def scans_for_host(host: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Prior verdicts for one hostname — how a host has scored over time."""
+    host = (host or "").lower().strip().rstrip(".")[:255]
+    if not host:
+        return []
     with session_scope() as session:
-        total = session.scalar(select(func.count(Scan.id))) or 0
+        rows = session.scalars(
+            select(Scan)
+            .where(Scan.host == host)
+            .order_by(Scan.created_at.desc())
+            .limit(max(1, min(limit, 50)))
+        ).all()
+        return [row.to_dict() for row in rows]
+
+
+def scan_stats(days: int = 30) -> dict[str, Any]:
+    """Verdict mix and mean score per day — the drift signal for the deployed model.
+
+    Every aggregate is filtered to the window. ``total_scans`` and the verdict
+    mix used to be all-time while ``daily`` returned the last N *populated* day
+    buckets, so a UI captioned "over the last 30 days" mixed three different
+    time ranges, none of which was the last 30 days.
+    """
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    with session_scope() as session:
+        window = Scan.created_at >= cutoff
+        total = session.scalar(select(func.count(Scan.id)).where(window)) or 0
+        all_time = session.scalar(select(func.count(Scan.id))) or 0
 
         verdicts = session.execute(
-            select(Scan.verdict, func.count(Scan.id)).group_by(Scan.verdict)
+            select(Scan.verdict, func.count(Scan.id)).where(window).group_by(Scan.verdict)
         ).all()
 
         day = func.date(Scan.created_at)
@@ -192,13 +263,16 @@ def scan_stats(days: int = 30) -> dict[str, Any]:
         )
         daily = session.execute(
             select(day, func.count(Scan.id), func.avg(live_probability))
+            .where(window)
             .group_by(day)
             .order_by(day.desc())
-            .limit(days)
         ).all()
 
         return {
+            "days": int(days),
+            "since": cutoff.isoformat(),
             "total_scans": int(total),
+            "total_scans_all_time": int(all_time),
             "verdicts": {str(v): int(c) for v, c in verdicts},
             "daily": [
                 {"date": str(d), "scans": int(c), "mean_probability": float(p or 0.0)}

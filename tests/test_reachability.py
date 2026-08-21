@@ -77,10 +77,40 @@ def test_fetch_page_records_dns_error_kind(monkeypatch):
         def close(self):
             pass
 
-    monkeypatch.setattr("phishing.features.fetch.requests.Session", BoomSession)
+    monkeypatch.setattr("phishing.features.fetch.guarded_session", BoomSession)
     result = fetch_page("https://no-such-host.invalid/")
     assert result.ok is False
     assert result.error_kind == "dns"
+
+
+def test_fetch_page_reports_non_2xx_as_a_failed_fetch(monkeypatch):
+    """A 404 or a WAF interstitial is not the page the user asked about."""
+
+    class Resp:
+        status_code = 503
+        headers = {"Content-Type": "text/html"}
+        encoding = "utf-8"
+
+        def iter_content(self, chunk_size=8192):
+            yield b"<html><title>Service unavailable</title></html>"
+
+        def close(self):
+            pass
+
+    class Session:
+        def get(self, *args, **kwargs):
+            return Resp()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("phishing.features.fetch.guarded_session", Session)
+    result = fetch_page("https://example.com/")
+    assert result.ok is False
+    assert result.status_code == 503
+    assert result.soup is None
+    assert result.html == ""
+    assert result.error_kind == "http"
 
 
 def _failed_fetch(kind: str) -> FetchResult:

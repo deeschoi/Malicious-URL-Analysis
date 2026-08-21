@@ -56,13 +56,15 @@ export function Layout({ children }: { children: ReactNode }) {
               </p>
             </div>
           </div>
-          <nav className="tabs" role="tablist">
+          {/* Plain navigation, not a tablist. role="tablist" without
+              aria-selected/aria-controls told a screen reader these were tabs
+              and then gave it none of the state a tab is supposed to carry. */}
+          <nav className="tabs" aria-label="Sections">
             {TABS.map((tab) => (
               <NavLink
                 key={tab.to}
                 to={tab.to}
                 end={tab.end}
-                role="tab"
                 className={({ isActive }) => (isActive ? "tab is-active" : "tab")}
               >
                 {tab.label}
@@ -76,10 +78,18 @@ export function Layout({ children }: { children: ReactNode }) {
       </main>
       <footer className="wrap footer">
         <p>
-          Sphinx is trained on the UCI Phishing Websites dataset (Mohammad, Thabtah
-          &amp; McCluskey, 2012). Accuracy figures come from a grouped hold-out
-          split in which no duplicate feature pattern is shared between training
-          and test data.
+          The scanner is trained on the PhiUSIIL Phishing URL dataset (Prasad
+          &amp; Chandra, 2023): 48 features from the URL string and the fetched
+          HTML, evaluated on a hold-out split grouped by hostname so no host
+          appears in both training and test. Held-out accuracy is measured on
+          that dataset's frozen columns; the live figures on each scan are the
+          same model re-extracting features over the network, and they are the
+          ones that describe a real scan.
+        </p>
+        <p>
+          The <strong>Research findings</strong> tab is separate coursework on
+          the older UCI Phishing Websites dataset (Mohammad, Thabtah &amp;
+          McCluskey, 2012). Nothing there is used to score a URL.
         </p>
       </footer>
     </>

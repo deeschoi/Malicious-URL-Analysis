@@ -95,7 +95,12 @@ export function Stats() {
           <div className="stat-row">
             <div className="stat">
               <strong>{stats.total_scans}</strong>
-              <span>scans recorded</span>
+              <span>
+                scans in the last {stats.days} days
+                {stats.total_scans_all_time > stats.total_scans
+                  ? ` (${stats.total_scans_all_time} all time)`
+                  : ""}
+              </span>
             </div>
             {mix.slice(0, 4).map((row) => (
               <div className="stat" key={row.verdict}>
@@ -107,7 +112,10 @@ export function Stats() {
 
           <section className="finding">
             <h3>Verdict mix</h3>
-            <p className="lede">Share of every stored scan, including reachability failures.</p>
+            <p className="lede">
+              Share of scans in the last {stats.days} days, including reachability
+              failures.
+            </p>
             <div className="mix">
               {mix.map((row) => (
                 <div className="mix-row" key={row.verdict}>

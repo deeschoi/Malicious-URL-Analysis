@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { Scanner } from "./views/Scanner";
 
@@ -16,15 +17,17 @@ const FindingsView = lazy(() =>
 export default function App() {
   return (
     <Layout>
-      <Suspense fallback={<p className="status">Loading…</p>}>
-        <Routes>
-          <Route path="/" element={<Scanner />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/stats" element={<Stats />} />
-          <Route path="/findings" element={<FindingsView />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<p className="status">Loading…</p>}>
+          <Routes>
+            <Route path="/" element={<Scanner />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/stats" element={<Stats />} />
+            <Route path="/findings" element={<FindingsView />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </Layout>
   );
 }

@@ -2,31 +2,39 @@ services:
   api:
     build: .
     image: phishing-scanner:latest
+    # 127.0.0.1 only. Publishing 8000 on every interface exposes an endpoint
+    # that makes outbound HTTP requests on a caller's behalf; put a reverse
+    # proxy in front and set SPHINX_API_KEY before changing this.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       PHISHING_ROOT: /app
       PHISHING_DATABASE_URL: ${PHISHING_DATABASE_URL:-sqlite:////app/data/scans.db}
+      SPHINX_API_KEY: ${SPHINX_API_KEY:-}
+      SPHINX_SCAN_RATE_PER_MINUTE: ${SPHINX_SCAN_RATE_PER_MINUTE:-20}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
     volumes:
       - scan-data:/app/data
     restart: unless-stopped
 
   # Opt in with: docker compose --profile postgres up
-  # then point the API at it:
-  #   PHISHING_DATABASE_URL=postgresql+psycopg2://phishing:phishing@db:5432/phishing
+  # Credentials come from the environment (or a .env file); there is no default
+  # password, so the profile fails loudly rather than starting with a known one.
   db:
     profiles: [postgres]
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: phishing
-      POSTGRES_PASSWORD: phishing
-      POSTGRES_DB: phishing
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-phishing}
+    # Not published: only the api service needs it, over the compose network.
+    expose:
+      - "5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U phishing"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5

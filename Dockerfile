@@ -58,7 +58,9 @@ RUN apt-get update \
 
 COPY --from=builder /opt/venv /opt/venv
 
-COPY datasets/ ./datasets/
+# The CSVs are only needed to train, and training already happened in the
+# builder stage. Copying them into the runtime image added ~100 MB of data
+# nothing at runtime reads.
 COPY api/ ./api/
 COPY reports/ ./reports/
 COPY --from=builder /build/artifacts/ ./artifacts/
@@ -70,7 +72,10 @@ USER scanner
 
 EXPOSE 8000
 
+# Readiness, not liveness: /api/health answers ok even with no model artifact
+# and no database, so an unhealthy instance kept receiving traffic and 503ing
+# every scan. /api/ready loads the artifact and pings the database.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+    CMD curl -fsS http://127.0.0.1:8000/api/ready || exit 1
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

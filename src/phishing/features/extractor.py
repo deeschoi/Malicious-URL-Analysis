@@ -220,11 +220,24 @@ def url_to_phiusiil_features(
 
     HTML that was not measured is filled with legitimate-class medians from
     training (not zeros). The scanner must still score those rows with the
-    URL-only model; zeros here would be the phishing prototype.
+    URL-only model; zeros here would be the phishing prototype, so ``html_fill``
+    is required and a caller that omits it gets a ``ValueError`` rather than a
+    quietly phishing-shaped row.
     """
     warnings: list[FeatureWarning] = []
     values: dict[str, float] = {c: 0.0 for c in PHIUSIIL_MODEL_FEATURES}
-    fill = {name: float((html_fill or {}).get(name, 0.0)) for name in PHIUSIIL_HTML_FEATURES}
+    # Fail closed rather than defaulting to zeros. All-zero HTML *is* the
+    # phishing prototype in this table, so a caller without the trained fills
+    # would silently score every unfetched page as a kit.
+    missing_fill = [name for name in PHIUSIIL_HTML_FEATURES if name not in (html_fill or {})]
+    if missing_fill:
+        raise ValueError(
+            "html_fill is required: scoring unmeasured HTML as zeros is the "
+            f"phishing prototype. Missing {len(missing_fill)} of "
+            f"{len(PHIUSIIL_HTML_FEATURES)} legitimate-class medians "
+            "(artifact.extra['html_fill'])."
+        )
+    fill = {name: float(html_fill[name]) for name in PHIUSIIL_HTML_FEATURES}
 
     try:
         values.update(extract_phiusiil_url_features(url, tld_prob=tld_prob))
@@ -235,6 +248,7 @@ def url_to_phiusiil_features(
     page_fetched = False
     tls_inspected = False
     dns_ok: bool | None = None
+    observed: dict[str, object] = {}
 
     def _fill_html(reason: str) -> None:
         for name in PHIUSIIL_HTML_FEATURES:
@@ -250,6 +264,13 @@ def url_to_phiusiil_features(
         else:
             result = fetch_page(url)
         page_url = result.final_url or url
+        observed = {
+            "final_url": page_url,
+            "status_code": result.status_code,
+            "n_redirects": int(result.n_redirects or 0),
+            "redirect_chain": tuple(result.history_urls or ()),
+            "truncated": bool(getattr(result, "truncated", False)),
+        }
         if result.ok and result.soup is not None:
             page_fetched = True
             dns_ok = True
@@ -275,6 +296,7 @@ def url_to_phiusiil_features(
         dns_ok=dns_ok,
         page_fetched=page_fetched,
         tls_inspected=tls_inspected,
+        **observed,
     )
     series = pd.Series({c: float(values[c]) for c in PHIUSIIL_MODEL_FEATURES}, dtype="float64")
     return series, warnings, probe

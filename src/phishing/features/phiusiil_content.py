@@ -58,6 +58,12 @@ def _host(url: str) -> str:
     return (urlparse(url).hostname or "").lower().rstrip(".")
 
 
+def _is_social_host(host: str) -> bool:
+    """Whole-label host match, so ``notx.com`` and ``x.com.evil.io`` do not count."""
+    host = (host or "").lower().rstrip(".")
+    return any(host == s or host.endswith("." + s) for s in SOCIAL_HOSTS)
+
+
 def _is_external(href: str, page_url: str) -> bool:
     if not href or href.startswith("data:"):
         return False
@@ -73,12 +79,21 @@ def _title_text(soup: BeautifulSoup) -> str:
 
 
 def _domain_core(page_url: str) -> str:
+    """The registrable label — ``bbc`` for ``bbc.co.uk``, not ``co``.
+
+    Splitting on the last two labels treats every multi-label public suffix as
+    the brand: ``bbc.co.uk`` returned ``co``, and a two-character needle matches
+    almost any title, so DomainTitleMatchScore came back a false 100%.
+    ``tldextract`` knows the public suffix list, so the label it reports is the
+    one a person would call the domain name.
+    """
+    ext = tldextract.extract(page_url)
+    if ext.domain:
+        return ext.domain.lower()
     host = _host(page_url)
     if host.startswith("www."):
         host = host[4:]
     parts = [p for p in host.split(".") if p]
-    if len(parts) >= 2:
-        return parts[-2]
     return parts[0] if parts else ""
 
 
@@ -130,17 +145,23 @@ def extract_phiusiil_content_features(fetch: FetchResult, page_url: str) -> dict
         absolute = urljoin(page_url, href)
         dest_host = _host(absolute)
         dest_reg = _registered(absolute)
-        if dest_reg in SOCIAL_HOSTS or any(
-            dest_host == s or dest_host.endswith("." + s) for s in SOCIAL_HOSTS
-        ):
+        if _is_social_host(dest_host) or dest_reg in SOCIAL_HOSTS:
             social = True
         if _is_external(href, page_url):
             n_ext += 1
         else:
             n_self += 1
-    html_l = html.lower()
-    if not social and any(host in html_l for host in SOCIAL_HOSTS):
-        social = True
+    if not social:
+        # Substring-matching the whole document was the old fallback and it
+        # fired on any CDN path containing "x.com" or "t.me". Only real link
+        # and script targets count, matched on the host, not on the text.
+        for tag in soup.find_all(["script", "iframe", "link"]):
+            candidate = (tag.get("src") or tag.get("href") or "").strip()
+            if not candidate:
+                continue
+            if _is_social_host(_host(urljoin(page_url, candidate))):
+                social = True
+                break
 
     forms = soup.find_all("form")
     external_submit = 0
@@ -150,7 +171,10 @@ def extract_phiusiil_content_features(fetch: FetchResult, page_url: str) -> dict
             external_submit = 1
             break
 
-    haystack = f"{html} {page_url}"
+    # The URL used to be part of the keyword haystack, which set Pay=1 for any
+    # host called pay.* or any /checkout path — including paypal.com itself.
+    # These columns describe what the *page* is about, so only markup is read.
+    haystack = html
     favicon = soup.find("link", rel=lambda v: v and "icon" in str(v).lower())
     robots = soup.find("meta", attrs={"name": re.compile(r"robots", re.I)})
     viewport = soup.find("meta", attrs={"name": re.compile(r"viewport", re.I)})

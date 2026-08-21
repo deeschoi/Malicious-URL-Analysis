@@ -21,6 +21,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  // Set when the API is deployed with SPHINX_API_KEY. Unset for the local demo.
+  const key = import.meta.env.VITE_SPHINX_API_KEY;
+  if (key) headers.set("X-API-Key", key);
   const response = await fetch(path, { ...init, headers });
   const payload: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -29,10 +32,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-export function scanUrl(url: string, timeout = 8) {
+export function scanUrl(url: string, timeout = 8, signal?: AbortSignal) {
   return request<import("./types").ScanResult>("/api/scan", {
     method: "POST",
     body: JSON.stringify({ url, timeout }),
+    signal,
+  });
+}
+
+export function fetchAgentStatus() {
+  return request<import("./types").AgentStatus>("/api/agent");
+}
+
+/** Ask the analyst about a scan. The scan payload is the grounding evidence;
+ *  the model reaches the rest through server-side tools. */
+export function askAnalyst(
+  scan: import("./types").ScanResult,
+  messages: import("./types").ChatMessage[],
+  signal?: AbortSignal,
+) {
+  return request<import("./types").ChatReply>("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ scan, messages }),
+    signal,
   });
 }
 

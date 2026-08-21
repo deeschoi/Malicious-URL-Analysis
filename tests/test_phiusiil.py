@@ -16,10 +16,23 @@ from phishing.features.phiusiil_url import (
     is_domain_ip,
 )
 
+# ``url_to_phiusiil_features`` fails closed without the trained legitimate-class
+# medians, because all-zero HTML is the phishing prototype in this table. Tests
+# that only care about the URL half pass explicit zeros and say so.
+_ZERO_FILL = dict.fromkeys(PHIUSIIL_HTML_FEATURES, 0.0)
+
 
 @pytest.fixture(scope="session")
 def phiusiil_xy():
     return load_phiusiil_xy()
+
+
+def test_phiusiil_extractor_requires_html_fill():
+    """Never default unmeasured HTML to zeros — that row *is* a kit."""
+    from phishing.features.extractor import url_to_phiusiil_features
+
+    with pytest.raises(ValueError, match="html_fill is required"):
+        url_to_phiusiil_features("https://www.example.com/", tier="A")
 
 
 def test_phiusiil_loader_inverts_label_and_drops_leaks(phiusiil_xy):
@@ -92,9 +105,16 @@ def test_path_and_trailing_slash_do_not_change_origin_counts():
         assert bare[key] == slash[key] == login[key]
         assert visa[key] == visa_home[key]
     assert slash["NoOfQMarkInURL"] == 0
+    # =?&% are counted on the same origin string as length and letters. When
+    # they were counted on the full URL, a legitimate deep link still carried
+    # the query-shape leak that moving length onto the origin was meant to fix.
     query = extract_phiusiil_url_features("https://github.com/search?q=1")
-    assert query["NoOfQMarkInURL"] == 1
+    assert query["NoOfQMarkInURL"] == 0
+    assert query["NoOfEqualsInURL"] == 0
     assert query["URLLength"] == bare["URLLength"]
+    encoded = extract_phiusiil_url_features("https://github.com/a%2Fb")
+    assert encoded["NoOfObfuscatedChar"] == 0
+    assert encoded["HasObfuscation"] == 0
 
 
 def test_url_features_keys_match_model():
@@ -161,7 +181,7 @@ def test_phiusiil_tier_a_extractor_offline():
     from phishing.features.extractor import url_to_phiusiil_features
 
     series, warnings, probe = url_to_phiusiil_features(
-        "https://www.example.com/login", tier="A"
+        "https://www.example.com/login", tier="A", html_fill=_ZERO_FILL
     )
     assert list(series.index) == PHIUSIIL_MODEL_FEATURES
     assert series["IsHTTPS"] == 1

@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup
+from requests.exceptions import TooManyRedirects
 
 from phishing.features.reachability import classify_network_error
+from phishing.netguard import (
+    UnsafeTargetError,
+    assert_public_url,
+    guarded_session,
+    strip_userinfo,
+)
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -16,6 +23,7 @@ USER_AGENT = (
 DEFAULT_TIMEOUT = 8
 MAX_BYTES = 2_000_000
 MAX_REDIRECTS = 8
+REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 
 
 @dataclass
@@ -31,6 +39,23 @@ class FetchResult:
     error: str | None = None
     error_kind: str | None = None
     content_type: str = ""
+    truncated: bool = False
+
+
+def _read_capped(response, max_bytes: int) -> tuple[bytes, bool]:
+    """Read at most ``max_bytes``, reporting whether the body was cut short."""
+    chunks: list[bytes] = []
+    size = 0
+    truncated = False
+    for chunk in response.iter_content(chunk_size=8192):
+        if not chunk:
+            continue
+        size += len(chunk)
+        if size > max_bytes:
+            truncated = True
+            break
+        chunks.append(chunk)
+    return b"".join(chunks), truncated
 
 
 def fetch_page(
@@ -40,54 +65,79 @@ def fetch_page(
 ) -> FetchResult:
     """GET ``url`` with a short timeout, size cap, and redirect accounting.
 
+    Redirects are followed by hand rather than by ``requests``: every hop is
+    re-validated against the SSRF guard before it is followed, because the whole
+    point of an open redirect is that hop *n+1* is chosen by the target, not by
+    us. The connection itself is made through a guarded adapter, so a hop that
+    passes the URL check and then rebinds to loopback still fails.
+
+    ``ok`` requires a 2xx response. A 404, a 503, or a WAF interstitial is not a
+    measurement of the page the user asked about; scoring that markup produced
+    verdicts on content the target never served. Those fall back to URL-only.
+
     JavaScript is not executed. Features that depend on runtime JS (status-bar
     spoofing, right-click handlers) are approximated from source text.
     """
-    session = requests.Session()
-    session.max_redirects = MAX_REDIRECTS
+    start_url = strip_userinfo(url)
+    session = guarded_session()
     headers = {"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"}
+    history: list[str] = []
+    current = start_url
     try:
-        resp = session.get(
-            url,
-            headers=headers,
-            timeout=timeout,
-            allow_redirects=True,
-            stream=True,
-        )
-        chunks: list[bytes] = []
-        size = 0
-        for chunk in resp.iter_content(chunk_size=8192):
-            if not chunk:
+        for _ in range(MAX_REDIRECTS + 1):
+            assert_public_url(current)
+            resp = session.get(
+                current,
+                headers=headers,
+                timeout=timeout,
+                allow_redirects=False,
+                stream=True,
+            )
+            location = resp.headers.get("Location")
+            if resp.status_code in REDIRECT_CODES and location:
+                resp.close()
+                history.append(current)
+                nxt = strip_userinfo(urljoin(current, location.strip()))
+                if urlparse(nxt).scheme.lower() not in {"http", "https"}:
+                    raise UnsafeTargetError(
+                        f"Refusing to follow a redirect to {urlparse(nxt).scheme!r}."
+                    )
+                current = nxt
                 continue
-            size += len(chunk)
-            if size > max_bytes:
-                break
-            chunks.append(chunk)
-        raw = b"".join(chunks)
-        content_type = resp.headers.get("Content-Type", "")
-        html = raw.decode(resp.encoding or "utf-8", errors="replace")
-        soup = BeautifulSoup(html, "lxml")
-        history = [r.url for r in resp.history]
-        return FetchResult(
-            url=url,
-            final_url=resp.url,
-            ok=True,
-            status_code=resp.status_code,
-            html=html,
-            soup=soup,
-            n_redirects=len(resp.history),
-            history_urls=history,
-            content_type=content_type,
-        )
+
+            raw, truncated = _read_capped(resp, max_bytes)
+            content_type = resp.headers.get("Content-Type", "")
+            html = raw.decode(resp.encoding or "utf-8", errors="replace")
+            ok = 200 <= resp.status_code < 300
+            soup = BeautifulSoup(html, "lxml") if ok else None
+            return FetchResult(
+                url=start_url,
+                final_url=current,
+                ok=ok,
+                status_code=resp.status_code,
+                html=html if ok else "",
+                soup=soup,
+                n_redirects=len(history),
+                history_urls=list(history),
+                content_type=content_type,
+                truncated=truncated,
+                error=None if ok else f"HTTP {resp.status_code}",
+                error_kind=None if ok else "http",
+            )
+
+        raise TooManyRedirects(f"Exceeded {MAX_REDIRECTS} redirects")
+    except UnsafeTargetError:
+        raise
     except Exception as exc:  # noqa: BLE001 — extractor must never raise
         return FetchResult(
-            url=url,
-            final_url=url,
+            url=start_url,
+            final_url=current,
             ok=False,
             status_code=None,
             html="",
             soup=None,
-            n_redirects=0,
+            n_redirects=len(history),
+            history_urls=list(history),
             error=f"{type(exc).__name__}: {exc}",
             error_kind=classify_network_error(exc),
         )

@@ -25,7 +25,10 @@ describe("format", () => {
 
 describe("verdict", () => {
   it("maps live and reachability verdicts", () => {
-    expect(verdictLabel("fetch_failed")).toBe("fetch failed");
+    // not_probed is what the API actually returns for an offline scan;
+    // fetch_failed never reaches the UI as a verdict.
+    expect(verdictLabel("not_probed")).toBe("not rated");
+    expect(verdictLabel("unreachable")).toBe("unreachable");
     expect(badgeClass("phishing")).toBe("is-phishing");
     expect(badgeClass("mystery")).toBe("is-unknown");
     expect(gaugeColour("suspicious")).toBe("#f5a524");

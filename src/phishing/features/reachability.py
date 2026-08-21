@@ -12,7 +12,7 @@ from __future__ import annotations
 import socket
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 ReachabilityStatus = Literal["resolved", "unreachable", "fetch_failed", "not_probed"]
 NetworkErrorKind = Literal["dns", "timeout", "connection", "ssl", "http", "other"]
@@ -23,19 +23,35 @@ LIVE_RISK_VERDICTS = frozenset({"legitimate", "probably safe", "suspicious", "ph
 
 @dataclass(frozen=True)
 class LiveProbe:
-    """Structured outcome of DNS / TLS / HTTP probes for one URL."""
+    """Structured outcome of DNS / TLS / HTTP probes for one URL.
+
+    The HTTP observation fields carry what the fetch actually saw so the API can
+    report the landing page rather than echoing the input. A URL that 302s to
+    another host was not the page that got scored, and hiding that hop from the
+    response made redirect-based phishing invisible in the UI.
+    """
 
     status: ReachabilityStatus
     dns_ok: bool | None
     page_fetched: bool
     tls_inspected: bool
+    final_url: str | None = None
+    status_code: int | None = None
+    n_redirects: int = 0
+    redirect_chain: tuple[str, ...] = ()
+    truncated: bool = False
 
-    def to_dict(self) -> dict[str, bool | str | None]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "dns_ok": self.dns_ok,
             "page_fetched": self.page_fetched,
             "tls_inspected": self.tls_inspected,
+            "final_url": self.final_url,
+            "status_code": self.status_code,
+            "n_redirects": self.n_redirects,
+            "redirect_chain": list(self.redirect_chain),
+            "truncated": self.truncated,
         }
 
 
@@ -129,6 +145,7 @@ def assess_reachability(
     dns_ok: bool | None,
     page_fetched: bool,
     tls_inspected: bool,
+    **observed: Any,
 ) -> LiveProbe:
     """Decide whether the host was seen, does not exist, or could not be fetched.
 
@@ -144,6 +161,7 @@ def assess_reachability(
             dns_ok=True,
             page_fetched=page_fetched,
             tls_inspected=tls_inspected,
+            **observed,
         )
     if not probed:
         return LiveProbe(
@@ -151,6 +169,7 @@ def assess_reachability(
             dns_ok=None,
             page_fetched=False,
             tls_inspected=False,
+            **observed,
         )
     if dns_ok is False:
         return LiveProbe(
@@ -158,10 +177,12 @@ def assess_reachability(
             dns_ok=False,
             page_fetched=False,
             tls_inspected=False,
+            **observed,
         )
     return LiveProbe(
         status="fetch_failed",
         dns_ok=True if dns_ok is None else dns_ok,
         page_fetched=False,
         tls_inspected=False,
+        **observed,
     )

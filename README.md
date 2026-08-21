@@ -6,8 +6,8 @@ The web app brands itself **Sphinx — URL Phishing Guardian**. Four tabs:
 
 | Tab | What it is for |
 |---|---|
-| **Scanner** | Paste a URL. Sphinx returns a verdict, probability, SHAP contributors, and scan coverage. |
-| **History** | Recent scans logged by the API. Query strings are stripped so session tokens never sit in the table. |
+| **Scanner** | Paste a URL. Sphinx returns a verdict, probability, SHAP contributors, and scan coverage — then lets you interrogate that scan in plain English (see [Ask about this scan](#ask-about-this-scan)). |
+| **History** | Recent scans logged by the API. Credentials, query strings, and token-shaped path segments are stripped before storage. |
 | **Stats** | Verdict mix and daily mean score, for spotting drift. Unreachable hosts are excluded from the mean. |
 | **Research findings** | Headline tables from the 2012 UCI analysis that started this project (leakage, encoding, decay). |
 
@@ -27,6 +27,10 @@ pip install -e .
 phishing train
 
 cd web && npm install && npm run build && cd ..
+
+# optional: enable the analyst chat
+cp .env.example .env && $EDITOR .env    # set GROQ_API_KEY
+
 uvicorn api.main:app --reload --port 8000
 ```
 
@@ -68,10 +72,26 @@ phishing scan --tier A https://example.com   # URL string only, no network fetch
 | `PHISHING_ARTIFACTS_DIR` | `$PHISHING_ROOT/artifacts` | Where the served model lives |
 | `PHISHING_REPORTS_DIR` | `$PHISHING_ROOT/reports` | Analysis tables and figures |
 | `PHISHING_DATABASE_URL` | `sqlite:///$PHISHING_ROOT/data/scans.db` | Scan telemetry store |
+| `SPHINX_API_KEY` | unset (routes open) | Shared secret for `/api/scan`, `/api/chat`, `/api/scans`, `/api/stats`, sent as `X-API-Key` |
+| `SPHINX_SCAN_RATE_PER_MINUTE` | `20` | Per-caller scan budget |
+| `SPHINX_SCAN_MAX_CONCURRENT` | `4` | Scans in flight before the API returns 503 |
+| `SPHINX_TRUST_PROXY_HEADERS` | `0` | Honour `X-Forwarded-For` for rate-limit identity. Only behind a proxy you control |
+| `GROQ_API_KEY` | unset (chat disabled) | Enables the analyst; the UI hides the panel without it |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Any tool-calling model Groq serves |
+
+Anything in `.env` at the repo root is loaded at startup and never overrides a real environment variable. `.env` is gitignored; `.env.example` documents every key.
+
+> **Before you expose this to a network.** `POST /api/scan` makes an outbound HTTP request to a URL the caller chooses. Set `SPHINX_API_KEY`, keep the rate limits on, and put it behind a reverse proxy. The compose file publishes port 8000 on `127.0.0.1` only, for that reason.
 
 ## What a scan does
 
-Sphinx only fetches public `http`/`https` URLs. Local, loopback, and private addresses are refused.
+Sphinx only fetches public `http`/`https` URLs. Because the target is chosen by whoever is typing, `src/phishing/netguard.py` closes three separate holes:
+
+- **The literal target.** Anything that is not a globally routable address is refused — loopback, RFC1918, link-local, CGNAT (`100.64.0.0/10`, which is neither `is_private` nor `is_global`), multicast, reserved, IPv4-mapped IPv6, and the cloud metadata IPs by name and by address.
+- **Redirects.** Auto-redirects are off. Each hop is re-validated before it is followed, because an open redirect lets the *target* choose hop *n+1*.
+- **DNS rebinding.** The connection is made through an adapter that checks the address the socket actually reached, so a short-TTL name that answers public for the check and loopback for the connection is dropped mid-handshake.
+
+`user:password@host` is stripped before the request is made, so credentials never reach the target or the scan history. A response has to be 2xx to count as a page: a 404, a parking page, or a WAF interstitial falls back to URL-only scoring instead of being scored as the site's own markup.
 
 The served estimator is **XGBoost** trained on [PhiUSIIL](https://archive.ics.uci.edu/dataset/967/phiusiil+phishing+url+dataset) (Prasad & Chandra, 2023): 235,795 rows, 48 features, 42.8% phishing. Evaluation is a **host-grouped holdout** — no hostname is shared between train and test. The label is recoded so **1 = phishing**.
 
@@ -90,6 +110,8 @@ Two estimators are persisted:
 A third path is a **disagreement rule**, not a third model. The page model's top weights (`NoOfExternalRef` 57%, `LineOfCode` 10%, `NoOfSelfRef` 9%) are the columns that moved between the 2023 crawl and 2026 markup, so a rich modern homepage can pin at *p* ≈ 1.0. When the page model says kit and the URL string looks clean, the URL score wins. That rule is gated: kits on shared-hosting suffixes (`github.io`, `vercel.app`, `firebaseapp.com`, …) keep the page score, because those URLs look clean by construction.
 
 Unreachable hosts do not get a live risk band. They get a `url_pattern_risk` chip — a judgment about the string, rendered distinctly from a fetched-page verdict.
+
+The response reports the page that was actually scored. A URL that 302s somewhere else shows the landing page and the hop count, because that redirect is often the whole attack.
 
 Every scan is logged so History and Stats work. A logging failure never fails a scan.
 
@@ -126,6 +148,33 @@ Of 240 hosts, 59 no longer resolve (56 of them phishing). That churn, not the mo
 
 A separate leak survives: `TLDLegitimateProb` is 0.013 for `.io` and 0.0015 for `.app`, so real sites on those TLDs score 0.83–0.95 on the URL string alone. `tests/test_phiusiil.py` pins that behaviour so a future fix has a failing test to flip.
 
+## Ask about this scan
+
+Every result carries a chat panel. It is an explanation layer over a scan that already happened — the verdict, the probability, and the SHAP attributions are computed by the classifier before a single token is generated, and the model is told in as many words that its own impression of a URL string is not evidence.
+
+Grounding is enforced by the tool surface rather than by asking nicely. `src/phishing/agent.py` exposes six tools over the real payload:
+
+| Tool | Returns |
+|---|---|
+| `get_signals` | The full ranked SHAP list, with whether each feature was measured |
+| `get_features` | Raw extracted values for any of the 48 columns |
+| `get_extraction_warnings` | What could not be measured, and what was substituted |
+| `get_model_card` | Dataset, holdout vs live metrics, thresholds, documented leaks |
+| `get_host_history` | Prior verdicts for the same hostname, from scan telemetry |
+| `rescan_url` | A fresh scan, through the same SSRF guard, capped per conversation |
+
+The UI lists which of these an answer actually consulted, so a claim can be traced to evidence rather than taken on faith.
+
+The system prompt is server-side and non-negotiable. Client messages are filtered to `user` and `assistant` turns before they are sent upstream, so a caller cannot smuggle in a system message or a fabricated tool result. Three things the prompt insists on:
+
+1. **Never clear a site.** A `legitimate` verdict means the model found no phishing signals — not that it is safe to type a password into. On the live sample this model misses about a quarter of the phishing pages it can reach.
+2. **Say which accuracy number applies.** ~99.9% is the frozen-column holdout; ~90.6% accuracy / 75% recall is live re-extraction, which is what a real scan gets.
+3. **Volunteer the known blind spots** — the plain-HTTP prior, the `.io`/`.app` TLD prior, and phishing kits on trusted platforms — when they bear on the answer.
+
+Asked about `http://neverssl.com`, which the scanner flags at *p* ≈ 1.0, it names `IsHTTPS` and its +10.9 log-odds contribution, then says the flag is more likely a false positive than evidence, because the training table has essentially no legitimate HTTP rows. That is the intended behaviour: the interesting answer is usually why a score should not be trusted.
+
+Transport is the OpenAI-compatible Groq endpoint over `requests` — no new dependency. Without `GROQ_API_KEY` the endpoint returns 503 and the panel explains how to enable it.
+
 ## Train, test, and research scripts
 
 ```bash
@@ -134,8 +183,6 @@ phishing train              # PhiUSIIL XGBoost → artifacts/model.joblib
 phishing evaluate           # 2012 leakage-delta table (research, not the served model)
 phishing validate           # 2012 Tier-A drift vs 2026 legitimate URLs
 ```
-
-`--tune` and `--quick` on `phishing train` are ignored; the served model is always the default XGBoost.
 
 Numbered scripts under `analysis/` write tables and figures to `reports/`. `01`–`05` still run on the 2012 UCI table. `06` trains the PhiUSIIL model Sphinx serves. `07` is the live re-extraction eval above.
 
@@ -161,6 +208,9 @@ Choi_Final.ipynb                      original coursework (untouched)
 src/phishing/
   fit.py                              train the PhiUSIIL scanner model
   scanner.py                          live scan → verdict, SHAP, coverage
+  netguard.py                         SSRF guards: redirects, rebinding, metadata IPs
+  agent.py                            Groq-backed analyst: grounding + tool loop
+  settings.py                         env / .env configuration and secrets
   cli.py                              train | scan | evaluate | validate
   data.py                             PhiUSIIL + UCI loaders, grouped splits
   db.py                               scan telemetry (SQLAlchemy, SQLite or Postgres)
@@ -170,7 +220,8 @@ src/phishing/
     extractor.py                      orchestrates a scan
     url_features.py / content_…       2012 extractors (research / validate)
 analysis/                             01–05: UCI research; 06: train; 07: live eval
-api/main.py                           FastAPI (scan, scans, stats, findings, UI)
+api/main.py                           FastAPI (scan, chat, scans, stats, findings, UI)
+api/security.py                       rate limits, concurrency cap, optional API key
 web/                                  React + Vite + TypeScript (Sphinx UI)
 migrations/                           alembic revisions for the scans table
 tests/                                pytest; network tests marked skippable
@@ -188,6 +239,9 @@ Dockerfile                            trains the model at build, serves via uvic
 - `TLDLegitimateProb` near zero for `.app` / `.io` inflates URL-only scores on real sites that use those TLDs.
 - Free-hosting suffixes are a routing hint, not a feature, because they almost perfectly separate the PhiUSIIL classes.
 - Grouped holdout is still i.i.d. across hosts, not across time. There is no temporal holdout.
+- The served model is **not calibrated**. Holdout Brier is 0.0004 on frozen columns, but live false positives pin at *p* ≈ 1.0 and platform-hosted kits at *p* ≈ 0. Read the gauge as a score, not as a frequency.
+- Rate limits and the concurrency cap are process-local. Replicating the API needs a shared store (Redis) to hold across instances.
+- The analyst explains a scan; it does not add detection. It can only be as right as the scan it is reading, and it is a language model — the tool trail under each answer is there to be checked.
 
 ## References
 

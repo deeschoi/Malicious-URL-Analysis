@@ -1,11 +1,12 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { scanUrl } from "../api";
+import { Analyst } from "../components/Analyst";
 import { Gauge } from "../components/Gauge";
 import { StatusMessage } from "../components/EmptyState";
 import { VerdictBadge } from "../components/VerdictBadge";
-import { pct, yesNo } from "../format";
-import { urlPatternClass, urlPatternLabel } from "../verdict";
+import { formatProbability, pct, yesNo } from "../format";
+import { WITHHELD_VERDICTS, urlPatternClass, urlPatternLabel } from "../verdict";
 import type { ScanResult, Signal } from "../types";
 
 const EXAMPLES = [
@@ -17,13 +18,9 @@ const EXAMPLES = [
 const LIVE_SIGNALS_TITLE = "Why the model decided this";
 const LIVE_SIGNALS_SUB =
   "Each bar is a SHAP value: how far that single signal pushed the score, in log-odds, away from the model's average prediction.";
-const URL_ONLY_SIGNALS_TITLE = "URL-string score (host not observed)";
+const URL_ONLY_SIGNALS_TITLE = "URL-string score (page not measured)";
 const URL_ONLY_SIGNALS_SUB =
-  "The model still scored the URL string and placeholder features. That number is not a live-site judgment.";
-
-// Verdicts that are not a live-site rating. For these the scanner withholds a
-// risk band, so the URL-string judgment is the only thing it can offer.
-const WITHHELD_VERDICTS = new Set(["unreachable", "fetch_failed", "not_probed"]);
+  "The model scored the URL string and placeholder features. That number is not a live-site judgment.";
 
 export function Scanner() {
   const [params] = useSearchParams();
@@ -32,30 +29,46 @@ export function Scanner() {
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
-
-  useEffect(() => {
-    const preset = params.get("url");
-    if (preset) setUrl(preset);
-  }, [params]);
+  // Guards against out-of-order responses: only the newest scan may write.
+  const requestId = useRef(0);
+  const autoScanned = useRef<string | null>(null);
 
   async function runScan(target: string) {
     const trimmed = target.trim();
-    if (!trimmed) return;
+    // Without this the example chips could start a second scan while the first
+    // was in flight, and whichever finished last won.
+    if (!trimmed || busy) return;
+    const id = ++requestId.current;
     setBusy(true);
-    setResult(null);
     setError(false);
-        setStatus("Fetching the page and parsing its HTML…");
+    setStatus("Fetching the page and parsing its HTML…");
     try {
       const payload = await scanUrl(trimmed);
+      if (id !== requestId.current) return;
       setResult(payload);
       setStatus(null);
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(true);
       setStatus(err instanceof Error ? err.message : "Scan failed.");
+      // The previous result is deliberately left on screen. Clearing it meant a
+      // transient network error wiped the verdict the user was still reading.
     } finally {
-      setBusy(false);
+      if (id === requestId.current) setBusy(false);
     }
   }
+
+  // History's "Scan again" navigates here with ?url=. Prefilling the box alone
+  // made that button a lie, so the scan actually runs — once per URL.
+  useEffect(() => {
+    const preset = params.get("url");
+    if (!preset) return;
+    setUrl(preset);
+    if (autoScanned.current === preset) return;
+    autoScanned.current = preset;
+    void runScan(preset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -74,7 +87,7 @@ export function Scanner() {
           spellCheck={false}
         />
         <button className="scan-button" type="submit" disabled={busy}>
-          Scan
+          {busy ? "Scanning…" : "Scan"}
         </button>
       </form>
       <p className="examples">
@@ -84,6 +97,7 @@ export function Scanner() {
             key={example.url}
             type="button"
             className="chip"
+            disabled={busy}
             onClick={() => {
               setUrl(example.url);
               void runScan(example.url);
@@ -93,7 +107,9 @@ export function Scanner() {
           </button>
         ))}
       </p>
-      {status ? <StatusMessage message={status} error={error} /> : null}
+      <div aria-live="polite" aria-atomic="true">
+        {status ? <StatusMessage message={status} error={error} /> : null}
+      </div>
       {result ? <ScanResultView result={result} /> : null}
     </>
   );
@@ -102,12 +118,14 @@ export function Scanner() {
 function ScanResultView({ result }: { result: ScanResult }) {
   const coverage = result.coverage;
   const quality = result.model_quality;
+  const live = quality.live_sample;
   const notes = [...(result.notes ?? [])];
   if (result.error) notes.unshift(result.error);
   // Only worth showing when there is no live verdict to show instead.
   const patternRisk = WITHHELD_VERDICTS.has(result.verdict)
     ? result.url_pattern_risk
     : null;
+  const redirected = result.final_url !== result.url;
 
   return (
     <article className="result">
@@ -123,6 +141,11 @@ function ScanResultView({ result }: { result: ScanResult }) {
             </span>
           ) : null}
           <h2 className="verdict-url">{result.final_url}</h2>
+          {redirected ? (
+            <p className="verdict-redirect">
+              Redirected from <span className="clip">{result.url}</span>
+            </p>
+          ) : null}
           <p className="rationale">{result.rationale}</p>
         </div>
         <Gauge
@@ -131,6 +154,8 @@ function ScanResultView({ result }: { result: ScanResult }) {
           urlOnly={result.url_only}
         />
       </div>
+
+      <DualScores result={result} />
 
       {notes.length ? (
         <div className="notes">
@@ -157,14 +182,17 @@ function ScanResultView({ result }: { result: ScanResult }) {
             <Meta term="Reachability" value={coverage.reachability || "—"} />
             <Meta term="DNS resolved" value={yesNo(coverage.dns_ok)} />
             <Meta term="Page downloaded" value={yesNo(coverage.page_fetched)} />
-            <Meta term="Certificate inspected" value={yesNo(coverage.tls_checked)} />
+            <Meta
+              term="HTTP status"
+              value={coverage.http_status ? String(coverage.http_status) : "—"}
+            />
+            <Meta term="Redirects followed" value={String(coverage.redirects ?? 0)} />
+            {/* Not "certificate inspected": no handshake is made and no
+                certificate is parsed. This is the scheme of the landing page. */}
+            <Meta term="Served over HTTPS" value={yesNo(coverage.https)} />
             <Meta
               term="Signals used"
               value={`${coverage.features_used} of ${coverage.features_in_dataset}`}
-            />
-            <Meta
-              term="Unavailable in 2026"
-              value={`${coverage.features_unavailable} features`}
             />
             <Meta term="Model" value={result.model} />
           </dl>
@@ -175,21 +203,63 @@ function ScanResultView({ result }: { result: ScanResult }) {
             <Meta term="Held-out accuracy" value={pct(quality.accuracy)} />
             <Meta term="AUROC" value={quality.auroc.toFixed(3)} />
             <Meta
-              term="Phishing caught at warn level"
-              value={`${(quality.recall_at_warn * 100).toFixed(0)}%`}
-            />
-            <Meta
-              term="False alarm rate"
-              value={pct(quality.false_positive_rate_at_warn)}
-            />
-            <Meta
               term="Warn / block thresholds"
               value={`${quality.warn_threshold.toFixed(2)} / ${quality.block_threshold.toFixed(2)}`}
             />
           </dl>
+          <p className="meta-caption">
+            Measured on {quality.measured_on ?? "a held-out split"} — not on live
+            pages.
+          </p>
+          {live ? (
+            <>
+              <h5 className="meta-subhead">On live pages</h5>
+              <dl>
+                <Meta term="Accuracy" value={pct(live.accuracy)} />
+                <Meta term="Phishing caught" value={pct(live.recall, 0)} />
+                <Meta term="False alarm rate" value={pct(live.false_positive_rate)} />
+              </dl>
+              <p className="meta-caption">
+                Same model, features re-extracted over the network on{" "}
+                {live.n_per_class ?? "—"} hosts per class. This is what a scan of a
+                real URL gets. {live.unrated_hosts ?? 0} sampled hosts no longer
+                resolved and were not rated at all.
+              </p>
+            </>
+          ) : null}
         </div>
       </div>
+
+      <Analyst result={result} />
     </article>
+  );
+}
+
+/** Both estimators' scores, shown whenever they exist and disagree materially.
+ *  The API has always returned these; hiding them made a rescued false positive
+ *  look like a mysteriously low page score. */
+function DualScores({ result }: { result: ScanResult }) {
+  const page = result.page_probability;
+  const urlScore = result.url_probability;
+  if (page == null || urlScore == null) return null;
+  const gap = Math.abs(page - urlScore);
+  if (!result.url_disagreement && gap < 0.2) return null;
+  return (
+    <div className={`dual-scores${result.url_disagreement ? " is-reconciled" : ""}`}>
+      <div className="dual-score">
+        <span className="dual-label">Page-content model</span>
+        <strong>{formatProbability(page)}</strong>
+      </div>
+      <div className="dual-score">
+        <span className="dual-label">URL-string model</span>
+        <strong>{formatProbability(urlScore)}</strong>
+      </div>
+      <p className="dual-note">
+        {result.url_disagreement
+          ? "The two models disagreed. The URL-string score is the one shown above, because the page model's heaviest features are the ones that drifted since the 2023 training crawl."
+          : "The two models differ on this page. The score above is the page model's; the URL-string score is what the model would say without downloading anything."}
+      </p>
+    </div>
   );
 }
 
@@ -203,6 +273,13 @@ function Meta({ term, value }: { term: string; value: string }) {
 }
 
 function SignalList({ signals }: { signals: Signal[] }) {
+  if (!signals.length) {
+    return (
+      <p className="section-sub">
+        No per-signal attribution is available for this scan.
+      </p>
+    );
+  }
   const scale = Math.max(...signals.map((s) => Math.abs(s.contribution)), 0.5);
   return (
     <ul className="signals">

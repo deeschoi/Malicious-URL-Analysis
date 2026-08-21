@@ -81,7 +81,10 @@ describe("Stats", () => {
       "fetch",
       vi.fn(() =>
         jsonResponse({
+          days: 30,
+          since: "2026-07-17T00:00:00+00:00",
           total_scans: 3,
+          total_scans_all_time: 11,
           verdicts: { "probably safe": 2, suspicious: 1 },
           daily: [{ date: "2026-08-16", scans: 3, mean_probability: 0.21 }],
         }),
@@ -92,7 +95,12 @@ describe("Stats", () => {
         <Stats />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("scans recorded")).toBeInTheDocument();
+    // Every aggregate is scoped to the window, and the caption says so rather
+    // than mixing an all-time total with a per-day series.
+    expect(
+      (await screen.findAllByText(/scans in the last 30 days/)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText(/11 all time/).length).toBeGreaterThan(0);
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Verdict mix")).toBeInTheDocument();
   });

@@ -128,7 +128,27 @@ jobs:
             fi
             sleep 2
           done
+          curl -fsS http://127.0.0.1:8000/api/ready
           curl -fsS http://127.0.0.1:8000/api/model | head -c 400
           curl -fsS http://127.0.0.1:8000/ | grep -q "Sphinx"
           curl -fsS http://127.0.0.1:8000/history | grep -q "Sphinx"
+
+          # The scan path was never smoke-tested in the container. A private
+          # target must be refused, and a well-formed request must return a
+          # scored payload rather than a 500 from a missing artifact.
+          for target in "http://127.0.0.1/" "http://169.254.169.254/latest/meta-data/"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              http://127.0.0.1:8000/api/scan \
+              -H 'Content-Type: application/json' \
+              -d "{\"url\": \"$target\"}")
+            if [ "$code" != "403" ]; then
+              echo "SSRF guard did not refuse $target (got $code)"
+              docker logs scanner; exit 1
+            fi
+          done
+
+          curl -fsS -X POST http://127.0.0.1:8000/api/scan \
+            -H 'Content-Type: application/json' \
+            -d '{"url": "https://example.com"}' | grep -q '"verdict"'
+
           docker rm -f scanner

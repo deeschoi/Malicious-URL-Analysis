@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
-import socket
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
@@ -25,14 +23,21 @@ from phishing.features.extractor import url_to_phiusiil_features
 from phishing.features.phiusiil_url import is_free_hosting_platform
 from phishing.features.reachability import LiveProbe
 from phishing.io import load_json, to_jsonable
+from phishing.netguard import (
+    BLOCKED_SCHEMES,
+    UnsafeTargetError,
+    assert_public_url,
+    strip_userinfo,
+)
 from phishing.schema import FeatureWarning, ModelArtifact
 from phishing.tuning import load_payload
 
-BLOCKED_SCHEMES = {"file", "javascript", "data", "ftp", "mailto"}
-
-
-class UnsafeTargetError(ValueError):
-    """The URL points at a local or private address and will not be fetched."""
+__all__ = [
+    "UnsafeTargetError",
+    "available_models",
+    "research_findings",
+    "scan",
+]
 
 
 def _clean_json(value: Any) -> Any:
@@ -40,6 +45,11 @@ def _clean_json(value: Any) -> Any:
 
 
 def _normalise_url(url: str) -> str:
+    """Canonicalise the input, refusing anything that is not a fetchable web URL.
+
+    ``user:password@host`` is dropped here rather than at fetch time so the
+    credentials never reach the request, the response payload, or scan history.
+    """
     text = url.strip()
     if not text:
         raise ValueError("URL is empty.")
@@ -55,42 +65,7 @@ def _normalise_url(url: str) -> str:
         raise ValueError("URL must use http or https.")
     if not parsed.hostname:
         raise ValueError("URL has no host.")
-    return text
-
-
-def _is_unsafe_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return bool(
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_link_local
-        or ip.is_multicast
-        or ip.is_reserved
-        or ip.is_unspecified
-    )
-
-
-def _assert_public_url(url: str) -> None:
-    host = urlparse(url).hostname or ""
-    lowered = host.lower().rstrip(".")
-    if lowered in {"localhost", "localhost.localdomain"} or lowered.endswith(".localhost"):
-        raise UnsafeTargetError("Refusing to scan a local address.")
-    try:
-        as_ip = ipaddress.ip_address(host)
-    except ValueError:
-        as_ip = None
-    if as_ip is not None and _is_unsafe_ip(as_ip):
-        raise UnsafeTargetError("Refusing to scan a private or local address.")
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except socket.gaierror:
-        return
-    for info in infos:
-        try:
-            ip = ipaddress.ip_address(info[4][0])
-        except (ValueError, IndexError):
-            continue
-        if _is_unsafe_ip(ip):
-            raise UnsafeTargetError("Refusing to scan a private or local address.")
+    return strip_userinfo(text)
 
 
 @lru_cache(maxsize=1)
@@ -98,7 +73,7 @@ def _loaded_payload() -> dict[str, Any]:
     path = ARTIFACTS_DIR / "model.joblib"
     if not path.exists():
         raise FileNotFoundError(
-            f"No trained model at {path}. From the repo root run: python run.py train --tune"
+            f"No trained model at {path}. From the repo root run: python run.py train"
         )
     return load_payload(path)
 
@@ -106,6 +81,25 @@ def _loaded_payload() -> dict[str, Any]:
 def _loaded_model() -> tuple[Any, ModelArtifact]:
     payload = _loaded_payload()
     return payload["estimator"], payload["artifact"]
+
+
+def _operating_point(
+    artifact: ModelArtifact, name: str, threshold: float, prefix: str = ""
+) -> dict[str, float]:
+    """Recall/FPR measured *at this cut*, not the warn-point numbers reused.
+
+    ``fit`` searches each operating point separately and stores the full
+    threshold report, so the block row does not have to borrow warn's metrics.
+    """
+    points = artifact.extra.get(f"{prefix}operating_points") or {}
+    report = points.get(name) or {}
+    metrics = artifact.extra.get("url_metrics") if prefix else artifact.metrics
+    metrics = metrics or {}
+    return {
+        "threshold": float(report.get("threshold", threshold)),
+        "recall": float(report.get("recall", metrics.get("recall", 0.0))),
+        "false_positive_rate": float(report.get("fpr", metrics.get("fpr", 0.0))),
+    }
 
 
 def available_models() -> dict[str, dict[str, Any]]:
@@ -116,32 +110,40 @@ def available_models() -> dict[str, dict[str, Any]]:
     metrics = artifact.metrics
     warn = float(artifact.threshold)
     block = float(artifact.extra.get("fpr_threshold", max(warn, 0.85)))
+    url_warn = float(artifact.extra.get("url_threshold", warn))
+    url_block = float(artifact.extra.get("url_fpr_threshold", max(url_warn, 0.85)))
     return {
         artifact.model_name: {
             "features": list(artifact.feature_names),
             "metrics": metrics,
+            "dataset": artifact.extra.get("dataset", ""),
+            "live_sample": artifact.extra.get("live_sample") or {},
             "thresholds": {
-                "warn": {
-                    "threshold": warn,
-                    "recall": float(metrics.get("recall", 0.0)),
-                    "false_positive_rate": float(metrics.get("fpr", 0.0)),
-                },
-                "block": {
-                    "threshold": block,
-                    "recall": float(metrics.get("recall", 0.0)),
-                    "false_positive_rate": float(metrics.get("fpr", 0.0)),
+                "warn": _operating_point(artifact, "warn", warn),
+                "block": _operating_point(artifact, "block", block),
+            },
+            "url_only": {
+                "features": list(artifact.extra.get("url_features") or PHIUSIIL_URL_FEATURES),
+                "metrics": artifact.extra.get("url_metrics") or {},
+                "thresholds": {
+                    "warn": _operating_point(artifact, "warn", url_warn, prefix="url_"),
+                    "block": _operating_point(artifact, "block", url_block, prefix="url_"),
                 },
             },
         }
     }
 
 
+# "probably safe" used to be pinned at 0.25, above the served warn cut of
+# 0.205, so the band could never be emitted: anything below warn was already
+# "legitimate". The bands are now derived from the cut the model actually
+# ships with, which keeps all four reachable at any threshold.
 def _risk(probability: float, warn: float, block: float) -> str:
     if probability >= block:
         return "phishing"
     if probability >= warn:
         return "suspicious"
-    if probability >= 0.25:
+    if probability >= warn / 2:
         return "probably safe"
     return "legitimate"
 
@@ -288,10 +290,15 @@ def _coverage(probe: LiveProbe, n_model_features: int) -> dict[str, Any]:
         "reachability": probe.status,
         "dns_ok": probe.dns_ok,
         "page_fetched": probe.page_fetched,
+        # HTTPS on the landing page, from the scheme. No handshake is made and
+        # no certificate is parsed, so this is not "certificate inspected".
+        "https": probe.tls_inspected,
         "tls_checked": probe.tls_inspected,
+        "http_status": probe.status_code,
+        "redirects": probe.n_redirects,
+        "truncated": probe.truncated,
         "features_used": n_model_features,
         "features_in_dataset": len(PHIUSIIL_MODEL_FEATURES),
-        "features_unavailable": 0,
     }
 
 
@@ -341,7 +348,7 @@ def scan(
 ) -> dict[str, Any]:
     """Extract features, score with the deployable model, and explain the verdict."""
     normalised = _normalise_url(url)
-    _assert_public_url(normalised)
+    assert_public_url(normalised)
     payload = _loaded_payload()
     estimator, artifact = payload["estimator"], payload["artifact"]
     url_estimator = payload.get("url_estimator")
@@ -355,6 +362,9 @@ def scan(
         tld_prob=tld_prob,
         html_fill=html_fill,
     )
+    # The page that was actually scored, which is not always the one pasted:
+    # a 302 to another host is exactly what redirect-based phishing does.
+    final_url = strip_userinfo(probe.final_url or normalised)
     withheld = _withhold_risk(probe)
     use_url_only = withheld or not _html_measured(probe)
     if use_url_only and url_estimator is not None:
@@ -419,12 +429,24 @@ def scan(
     verdict = probe.status if withheld else risk
     warning_map = _warning_by_feature(warnings)
 
+    # SHAP must explain the number on screen. Before the disagreement rule
+    # switched the scorer, explanations were still computed on the page
+    # estimator, so the bars cited page-richness while the gauge showed a
+    # URL-string probability.
+    if disagreement:
+        explained_estimator = url_estimator
+        explained_names = url_feature_names
+    else:
+        explained_estimator = scorer
+        explained_names = feature_names
+    explained_X = features[explained_names].to_frame().T
+
     signals: list[dict[str, Any]] = []
     try:
         from phishing.explain import shap_values
 
-        _, values = shap_values(scorer, X, background=X)
-        signals = _signals(feature_names, values[0], features, warning_map)
+        _, values = shap_values(explained_estimator, explained_X, background=explained_X)
+        signals = _signals(explained_names, values[0], features, warning_map)
     except Exception as exc:  # noqa: BLE001
         signals = []
         shap_error = f"SHAP unavailable: {exc}"
@@ -444,9 +466,17 @@ def scan(
         )
     if use_url_only:
         if probe.status == "fetch_failed":
-            fetch_note = (
-                "The page could not be fetched. This score is from the URL string only."
-            )
+            status_code = probe.status_code
+            if status_code is not None and not (200 <= status_code < 300):
+                fetch_note = (
+                    f"The server answered HTTP {status_code}, so no page from this "
+                    "URL was measured. An error, parking, or block page is not the "
+                    "site being judged. This score is from the URL string only."
+                )
+            else:
+                fetch_note = (
+                    "The page could not be fetched. This score is from the URL string only."
+                )
             if normalised.lower().startswith("http://"):
                 fetch_note += (
                     " This dataset has no legitimate HTTP pages, so plain HTTP "
@@ -458,10 +488,25 @@ def scan(
                 0,
                 "Page HTML was not measured; this probability comes from the URL-only model.",
             )
+    if probe.truncated:
+        notes.insert(
+            0,
+            "The page exceeded the 2 MB download cap, so HTML counts below are "
+            "measured on a partial document.",
+        )
+    if final_url != normalised:
+        notes.insert(
+            0,
+            f"This URL redirected {probe.n_redirects} time"
+            f"{'' if probe.n_redirects == 1 else 's'} and the page scored was "
+            f"{final_url}.",
+        )
 
     payload_out = {
         "url": normalised,
-        "final_url": normalised,
+        "final_url": final_url,
+        "redirect_chain": list(probe.redirect_chain),
+        "http_status": probe.status_code,
         "reachability": probe.to_dict(),
         "risk": None if withheld else risk,
         "verdict": verdict,
@@ -477,6 +522,11 @@ def scan(
         "signals": signals,
         "coverage": _coverage(probe, len(feature_names)),
         "model": model_label,
+        # Two different measurements, labelled as such. The holdout numbers are
+        # the frozen 2023 CSV columns; the live-sample numbers are the same
+        # model re-extracting features over the network, which is what a user
+        # of this scanner actually gets. Showing only the first read as 99.95%
+        # accuracy on live 2026 pages, which is not true.
         "model_quality": {
             "accuracy": float(metrics.get("accuracy", 0.0)),
             "auroc": float(metrics.get("auroc", 0.0)),
@@ -484,6 +534,8 @@ def scan(
             "false_positive_rate_at_warn": float(metrics.get("fpr", 0.0)),
             "warn_threshold": warn,
             "block_threshold": block,
+            "measured_on": "grouped holdout of the frozen 2023 dataset columns",
+            "live_sample": artifact.extra.get("live_sample") or None,
         },
         "prediction": (
             None if withheld else ("phishing" if probability >= warn else "legitimate")

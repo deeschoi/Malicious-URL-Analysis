@@ -98,9 +98,16 @@ body {
 }
 .url-input::placeholder { color: #7a6a52; }
 .url-input:focus {
-  outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(212, 160, 74, 0.18);
+}
+/* The input used to set `outline: none` with nothing in its place, which
+   removes the only focus affordance a keyboard user has. Every interactive
+   element gets a visible ring instead. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .scan-button, .ghost-button {
@@ -137,7 +144,8 @@ body {
   font: inherit; font-size: 12.5px; padding: 4px 12px; margin-left: 6px;
   transition: color .15s, border-color .15s;
 }
-.chip:hover { color: var(--text); border-color: var(--accent); }
+.chip:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.chip:disabled { opacity: .5; cursor: not-allowed; }
 
 .status {
   margin-top: 22px; padding: 15px 18px;
@@ -383,4 +391,136 @@ tr:last-child td { border-bottom: 0; }
   .verdict-card { gap: 18px; }
   .mix-row { grid-template-columns: 1fr 48px; }
   .mix-row span:first-child { grid-column: 1 / -1; }
+}
+
+
+/* --- Redirect provenance ------------------------------------------------- */
+.verdict-redirect {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.verdict-redirect .clip { color: var(--sand); }
+
+/* --- Two estimators, two scores ------------------------------------------ */
+.dual-scores {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+}
+.dual-scores.is-reconciled { border-left: 3px solid var(--warn); }
+.dual-score { display: flex; flex-direction: column; gap: 2px; }
+.dual-label { color: var(--muted); font-size: 12.5px; }
+.dual-score strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.dual-note {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 70ch;
+}
+
+/* --- Model reliability captions ------------------------------------------ */
+.meta-caption {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.meta-subhead {
+  margin: 16px 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* --- Analyst chat --------------------------------------------------------- */
+.analyst {
+  margin-top: 30px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.analyst.is-off { opacity: .8; }
+.analyst .section-title { margin-top: 0; }
+.analyst-log {
+  display: grid;
+  gap: 14px;
+  max-height: 460px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.analyst-hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+.analyst-turn {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+}
+.analyst-turn.is-user {
+  background: transparent;
+  border-color: transparent;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  padding: 2px 0 2px 14px;
+}
+.analyst-who {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+}
+.analyst-text { white-space: pre-wrap; font-size: 14.5px; line-height: 1.65; }
+.analyst-thinking { color: var(--muted); }
+.analyst-tools {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+.analyst-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 12px;
+}
+.analyst-prompts .chip { margin-left: 0; }
+.analyst-bar { display: flex; gap: 10px; }
+.analyst-bar .url-input { padding: 12px 15px; font-size: 14.5px; }
+.analyst-bar .scan-button { padding: 0 22px; }
+.analyst-model {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 70ch;
+}
+
+.crash-detail {
+  margin: 10px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Honour the OS setting. The gauge sweep and the result rise are decorative,
+   and vestibular triggers are not a style choice. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -126,14 +126,18 @@ def extract_phiusiil_url_features(
 
     host_core = host[4:] if host.startswith("www.") else host
     count_url = _url_for_char_counts(url, host)
-    encoded = _PERCENT.findall(url)
+    # Every character count reads the same origin string. Counting =?&% on the
+    # full URL while length/letters/specials used the origin was the same
+    # homepage-shape leak in a different column: no legitimate PhiUSIIL row has
+    # a query, so a legitimate deep link like /search?q=1 still scored as a kit.
+    encoded = _PERCENT.findall(count_url)
     n_obf = len(encoded)
     length = max(len(count_url), 1)
     letters = sum(c.isalpha() for c in count_url)
     digits = sum(c.isdigit() for c in count_url)
-    n_eq = url.count("=")
-    n_qm = url.count("?")
-    n_amp = url.count("&")
+    n_eq = count_url.count("=")
+    n_qm = count_url.count("?")
+    n_amp = count_url.count("&")
     # Specials on the origin only. Path/query punctuation is a class leak:
     # no legitimate PhiUSIIL row has a path, so /en-us looked like a kit.
     other_special = sum(
@@ -148,7 +152,7 @@ def extract_phiusiil_url_features(
         "NoOfSubDomain": float(max(0, n_labels - 2) if not ip else 0),
         "HasObfuscation": float(1 if n_obf else 0),
         "NoOfObfuscatedChar": float(n_obf),
-        "ObfuscationRatio": float(n_obf / max(len(url), 1)),
+        "ObfuscationRatio": float(n_obf / length),
         "NoOfLettersInURL": float(letters),
         "LetterRatioInURL": float(letters / length),
         "NoOfDegitsInURL": float(digits),

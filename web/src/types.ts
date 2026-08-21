@@ -1,11 +1,16 @@
+/** Closed union. `| string` here defeated every exhaustiveness check the
+ *  compiler could have run, which is how `not_probed` shipped with no label
+ *  and rendered as a raw identifier in the verdict badge. */
 export type Verdict =
   | "phishing"
   | "suspicious"
   | "probably safe"
   | "legitimate"
   | "unreachable"
-  | "fetch_failed"
-  | string;
+  | "not_probed";
+
+/** Live-site risk bands. Withheld verdicts carry `risk: null` instead. */
+export type Risk = "phishing" | "suspicious" | "probably safe" | "legitimate";
 
 export interface Signal {
   feature: string;
@@ -22,10 +27,25 @@ export interface Coverage {
   reachability: string;
   dns_ok: boolean | null;
   page_fetched: boolean;
+  /** HTTPS on the landing page, read from the scheme. No handshake is made. */
+  https: boolean;
   tls_checked: boolean;
+  http_status: number | null;
+  redirects: number;
+  truncated: boolean;
   features_used: number;
   features_in_dataset: number;
-  features_unavailable: number;
+}
+
+export interface LiveSample {
+  accuracy: number;
+  recall: number;
+  false_positive_rate: number;
+  precision?: number;
+  n_per_class?: number;
+  unrated_hosts?: number;
+  seed?: number;
+  note?: string;
 }
 
 export interface ModelQuality {
@@ -35,12 +55,43 @@ export interface ModelQuality {
   false_positive_rate_at_warn: number;
   warn_threshold: number;
   block_threshold: number;
+  measured_on?: string;
+  /** Same model, features re-extracted over the network. What a real scan gets. */
+  live_sample?: LiveSample | null;
+}
+
+export interface FeatureWarning {
+  feature: string;
+  message: string;
+  fallback: number;
+}
+
+export interface Reachability {
+  status: string;
+  dns_ok: boolean | null;
+  page_fetched: boolean;
+  tls_inspected: boolean;
+  final_url: string | null;
+  status_code: number | null;
+  n_redirects: number;
+  redirect_chain: string[];
+  truncated: boolean;
 }
 
 export interface ScanResult {
   url: string;
+  /** The page that was actually scored. Differs from `url` after a redirect. */
   final_url: string;
+  redirect_chain?: string[];
+  http_status?: number | null;
+  reachability: Reachability;
   verdict: Verdict;
+  /** null whenever the verdict is withheld — there is no live-site rating. */
+  risk: Risk | null;
+  prediction: "phishing" | "legitimate" | null;
+  threshold: number;
+  warnings: FeatureWarning[];
+  features: Record<string, number>;
   url_only: boolean;
   probability: number;
   /** Page-model score before any disagreement fallback; null when HTML was not measured. */
@@ -48,7 +99,7 @@ export interface ScanResult {
   /** URL-string-only score, always present when the fallback model is loaded. */
   url_probability?: number | null;
   /** Judgment of the URL string alone. Not a live-site verdict. */
-  url_pattern_risk?: Verdict | null;
+  url_pattern_risk?: Risk | null;
   /** True when the URL-string score replaced a high page-model score. */
   url_disagreement?: boolean;
   rationale: string;
@@ -86,9 +137,35 @@ export interface DailyStat {
 }
 
 export interface ScanStats {
+  /** Size of the window every aggregate below is filtered to. */
+  days: number;
+  since: string;
   total_scans: number;
+  total_scans_all_time: number;
   verdicts: Record<string, number>;
   daily: DailyStat[];
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ToolUse {
+  tool: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ChatReply {
+  reply: string;
+  tools_used: ToolUse[];
+  model: string;
+}
+
+export interface AgentStatus {
+  enabled: boolean;
+  model: string | null;
+  detail: string | null;
 }
 
 export interface Leakage {
